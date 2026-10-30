@@ -25,7 +25,7 @@
                 <h1 class="text-xl font-bold tracking-wide">教務手帳 出欠管理アプリ</h1>
             </div>
             
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
                 <button onclick="copyShareUrl()" class="bg-indigo-800 hover:bg-indigo-900 text-indigo-100 px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-1.5 border border-indigo-500">
                     <i class="fa-solid fa-share-nodes text-amber-300"></i> 共有URLコピー
                 </button>
@@ -60,13 +60,13 @@
                 <div>
                     <label class="block text-xs text-slate-500 font-semibold mb-1">科目</label>
                     <div id="subjectDisplay" class="text-sm font-bold text-slate-700 bg-slate-100 p-2 rounded-lg border border-slate-200 min-w-[140px]">
-                        英語コミュニケーションⅡ
+                        -
                     </div>
                 </div>
                 <div>
                     <label class="block text-xs text-slate-500 font-semibold mb-1">単位数</label>
                     <div id="creditDisplay" class="text-sm font-bold text-slate-700 bg-slate-100 p-2 rounded-lg border border-slate-200 min-w-[80px] text-center">
-                        2単位
+                        -
                     </div>
                 </div>
             </div>
@@ -121,6 +121,70 @@
 
     </main>
 
+    <!-- Class & Subject Modal -->
+    <div id="classModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-6 flex flex-col gap-4">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-gear text-indigo-600"></i> クラス・科目設定
+            </h3>
+            
+            <div class="flex flex-col gap-3 text-sm">
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">クラス名</label>
+                    <input type="text" id="modalClassName" placeholder="例: 1年1組" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">科目名</label>
+                    <input type="text" id="modalSubjectName" placeholder="例: 英語コミュニケーションⅡ" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">単位数</label>
+                    <input type="number" id="modalCredit" min="1" max="10" value="2" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center pt-2 border-t border-slate-100 mt-2">
+                <button onclick="deleteCurrentClass()" class="text-xs text-red-600 hover:text-red-700 font-medium border border-red-200 hover:border-red-300 px-2.5 py-1.5 rounded">
+                    このクラスを削除
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="closeClassModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium">キャンセル</button>
+                    <button onclick="saveClassSettings()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Edit & Excel Modal -->
+    <div id="studentModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full p-6 flex flex-col gap-4">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-user-pen text-indigo-600"></i> 生徒編集 (<span id="studentModalClassName"></span>)
+            </h3>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 flex flex-col gap-1">
+                <span class="font-bold text-indigo-900">💡 生徒名の登録方法（以下のどちらか）</span>
+                <span>1. 下のテキストエリアに「1 〇〇〇〇」形式で直接貼り付け・編集できます。</span>
+                <span>2. Excelファイル（.xlsx / .csv）をそのままドラッグ＆ドロップまたは選択して自動読込できます。</span>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Excel・CSVファイルを読み込む</label>
+                <input type="file" accept=".xlsx, .xls, .csv" onchange="handleFileUpload(event)" class="text-xs w-full text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">生徒名簿一覧（1行に1名 / 番号 氏名）</label>
+                <textarea id="studentListText" rows="10" placeholder="1 青木 一郎&#10;2 井上 次郎&#10;3 上野 三郎" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-mono focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 border-t border-slate-100 pt-3">
+                <button onclick="closeStudentModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium">キャンセル</button>
+                <button onclick="saveStudentList()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">保存する</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -138,7 +202,7 @@
         let currentUser = null;
         let unsubscribe = null;
 
-        // ランダムなIDを自動生成する関数（他の先生と被らないようにする）
+        // ランダムなIDを自動生成する関数（先生ごとに被らないようにする）
         function generateRandomRoomId() {
             return 'room-' + Math.random().toString(36).substring(2, 9);
         }
@@ -173,9 +237,15 @@
 
         async function startCloudSync() {
             const ready = await window.initFirebase();
-            document.getElementById('shareIdDisplay').textContent = roomId;
+            const shareIdEl = document.getElementById('shareIdDisplay');
+            if (shareIdEl) shareIdEl.textContent = roomId;
+
             if (ready) {
                 subscribeCloud();
+            } else {
+                window.loadLocalStorage();
+                window.renderClassSelect();
+                window.renderTable();
             }
         }
 
@@ -210,7 +280,6 @@
         };
 
         window.copyShareUrl = function() {
-            // 現在の共有IDをパラメータに含めたリンクを作成
             const baseUrl = window.location.href.split('?')[0].split('#')[0];
             const shareUrl = `${baseUrl}?room=${encodeURIComponent(roomId)}`;
             
@@ -221,7 +290,7 @@
             document.execCommand('copy');
             document.body.removeChild(tempInput);
 
-            alert(`【現在の共有ID（合言葉）: ${roomId}】\n\n【他の自分の端末で同期する方法】\n1. 他のスマホやPCで本アプリを開きます。\n2. ヘッダーの「共有ID変更」をタップします。\n3. 合言葉「${roomId}」を入力すると同じデータがリアルタイム同期されます。`);
+            alert(`【現在の共有ID: ${roomId}】\n\n【他の自分の端末で同期する方法】\n1. 他のスマホやPCで本アプリを開きます。\n2. ヘッダーの「共有ID変更」をタップします。\n3. 合言葉「${roomId}」を入力すると同じデータがリアルタイム同期されます。`);
         };
 
         window.changeRoomIdPrompt = function() {
@@ -232,7 +301,10 @@
                 const currentUrl = new URL(window.location.href);
                 currentUrl.searchParams.set('room', roomId);
                 window.history.pushState({}, '', currentUrl);
-                document.getElementById('shareIdDisplay').textContent = roomId;
+                
+                const shareIdEl = document.getElementById('shareIdDisplay');
+                if (shareIdEl) shareIdEl.textContent = roomId;
+                
                 if (unsubscribe) unsubscribe();
                 subscribeCloud();
                 alert(`共有IDを「${roomId}」に変更し、データの同期を開始しました。`);
@@ -241,30 +313,39 @@
 
         // Start Auto Sync on Page Load
         window.addEventListener('load', () => {
+            // Set default date picker to today
+            const todayStr = new Date().toISOString().split('T')[0];
+            const dateInput = document.getElementById('targetDate');
+            if (dateInput) dateInput.value = todayStr;
+
             startCloudSync();
         });
     </script>
 
     <script>
-        // Default State Data Structure (Clean Initial State)
+        // Initial Sample State Structure
         window.appData = {
             currentClass: '1年1組',
             classes: {
                 '1年1組': {
-                    subject: '国語',
+                    subject: '英語コミュニケーションⅡ',
                     credit: 2,
-                    students: []
+                    students: [
+                        { id: 1, no: 1, name: '相沢 拓海', dates: ['10/2', '10/12'] },
+                        { id: 2, no: 2, name: '伊藤 結衣', dates: [] },
+                        { id: 3, no: 3, name: '上野 翔太', dates: ['9/15', '9/22', '10/5', '10/19', '10/26'] }
+                    ]
                 }
             }
         };
 
         // Unified Save Handler (Local + Cloud)
-        function saveData() {
+        window.saveData = function() {
             saveLocalStorage();
             if (window.syncToCloud) {
                 window.syncToCloud();
             }
-        }
+        };
 
         // Save to LocalStorage
         function saveLocalStorage() {
@@ -272,7 +353,7 @@
         }
 
         // Load from LocalStorage
-        function loadLocalStorage() {
+        window.loadLocalStorage = function() {
             const saved = localStorage.getItem('attendance_app_data');
             if (saved) {
                 try {
@@ -281,7 +362,7 @@
                     console.error("Failed to parse storage data");
                 }
             }
-        }
+        };
 
         // Helper: Date Normalizer & Sorter
         function sortDates(dates) {
@@ -308,8 +389,9 @@
         }
 
         // Render Class Dropdown & Top Displays
-        function renderClassSelect() {
+        window.renderClassSelect = function() {
             const select = document.getElementById('classSelect');
+            if (!select) return;
             select.innerHTML = '';
             
             Object.keys(window.appData.classes).forEach(cls => {
@@ -325,37 +407,34 @@
                 document.getElementById('subjectDisplay').textContent = current.subject || '（未設定）';
                 document.getElementById('creditDisplay').textContent = `${current.credit || 1}単位`;
             }
-        }
+        };
 
         // Switch Active Class
-        function changeClass(className) {
+        window.changeClass = function(className) {
             window.appData.currentClass = className;
-            saveData();
-            renderClassSelect();
-            renderTable();
-        }
+            window.saveData();
+            window.renderClassSelect();
+            window.renderTable();
+        };
 
         // Render Main Table
-        function renderTable() {
+        window.renderTable = function() {
             const tbody = document.getElementById('studentTableBody');
+            if (!tbody) return;
             tbody.innerHTML = '';
 
             const currentCls = window.appData.classes[window.appData.currentClass];
             if (!currentCls) return;
 
             const credit = currentCls.credit || 1;
-            const maxAllowed = credit * 12; // Uncertified limit
+            const maxAllowed = credit * 12; // 履修不認定基準例
 
             currentCls.students.forEach((student) => {
-                // Sorting Dates chronologically
                 student.dates = sortDates(student.dates);
 
                 const count = student.dates.length;
                 const remainingHours = maxAllowed - count;
 
-                // Threshold logic:
-                // 残り6〜10時間: ❗️ (数字が黄色)
-                // 残り5時間以下: ‼️ (氏名＆数字が赤)
                 let nameColorClass = "text-slate-800 font-medium";
                 let countColorClass = "text-slate-700 font-bold";
                 let warningBadge = "";
@@ -408,17 +487,18 @@
                 tbody.appendChild(tr);
             });
 
-            document.getElementById('selectAll').checked = false;
-        }
+            const selectAllCb = document.getElementById('selectAll');
+            if (selectAllCb) selectAllCb.checked = false;
+        };
 
         // Toggle Select All Checkboxes
-        function toggleSelectAll(master) {
+        window.toggleSelectAll = function(master) {
             const checkboxes = document.querySelectorAll('.student-checkbox');
             checkboxes.forEach(cb => cb.checked = master.checked);
-        }
+        };
 
         // Add Target Date to Selected Students
-        function addDateToSelected() {
+        window.addDateToSelected = function() {
             const rawDate = document.getElementById('targetDate').value;
             if (!rawDate) {
                 alert('日付を選択してください');
@@ -442,12 +522,12 @@
                 }
             });
 
-            saveData();
-            renderTable();
-        }
+            window.saveData();
+            window.renderTable();
+        };
 
         // Add Quick Date (Today) to Single Student
-        function quickAddCurrentDate(studentId) {
+        window.quickAddCurrentDate = function(studentId) {
             const rawDate = document.getElementById('targetDate').value || new Date().toISOString().split('T')[0];
             const formattedDate = formatDateStr(rawDate);
 
@@ -455,50 +535,50 @@
             const student = currentCls.students.find(s => s.id === studentId);
             if (student) {
                 student.dates.push(formattedDate);
-                saveData();
-                renderTable();
+                window.saveData();
+                window.renderTable();
             }
-        }
+        };
 
         // Add Single Date via Manual Prompt
-        function addSingleDatePrompt(studentId) {
+        window.addSingleDatePrompt = function(studentId) {
             const input = prompt("追加する欠課日付を入力してください (例: 11/2)", formatDateStr(document.getElementById('targetDate').value));
             if (input && input.trim()) {
                 const currentCls = window.appData.classes[window.appData.currentClass];
                 const student = currentCls.students.find(s => s.id === studentId);
                 if (student) {
                     student.dates.push(input.trim());
-                    saveData();
-                    renderTable();
+                    window.saveData();
+                    window.renderTable();
                 }
             }
-        }
+        };
 
         // Remove Date Entry
-        function removeDate(studentId, dateIndex) {
+        window.removeDate = function(studentId, dateIndex) {
             const currentCls = window.appData.classes[window.appData.currentClass];
             const student = currentCls.students.find(s => s.id === studentId);
             if (student) {
                 student.dates.splice(dateIndex, 1);
-                saveData();
-                renderTable();
+                window.saveData();
+                window.renderTable();
             }
-        }
+        };
 
         // --- Class Modal Logic ---
-        function openClassModal() {
+        window.openClassModal = function() {
             const current = window.appData.classes[window.appData.currentClass];
-            document.getElementById('modalClassName').value = window.appData.currentClass;
+            document.getElementById('modalClassName').value = window.appData.currentClass || '';
             document.getElementById('modalSubjectName').value = current ? current.subject : '';
             document.getElementById('modalCredit').value = current ? current.credit : 2;
             document.getElementById('classModal').classList.remove('hidden');
-        }
+        };
 
-        function closeClassModal() {
+        window.closeClassModal = function() {
             document.getElementById('classModal').classList.add('hidden');
-        }
+        };
 
-        function saveClassSettings() {
+        window.saveClassSettings = function() {
             const className = document.getElementById('modalClassName').value.trim();
             const subjectName = document.getElementById('modalSubjectName').value.trim();
             const creditVal = parseInt(document.getElementById('modalCredit').value, 10);
@@ -520,13 +600,13 @@
             }
 
             window.appData.currentClass = className;
-            saveData();
-            renderClassSelect();
-            renderTable();
-            closeClassModal();
-        }
+            window.saveData();
+            window.renderClassSelect();
+            window.renderTable();
+            window.closeClassModal();
+        };
 
-        function deleteCurrentClass() {
+        window.deleteCurrentClass = function() {
             if (Object.keys(window.appData.classes).length <= 1) {
                 alert('最後のクラスは削除できません');
                 return;
@@ -535,15 +615,15 @@
             if (confirm(`クラス「${window.appData.currentClass}」を削除してもよろしいですか？`)) {
                 delete window.appData.classes[window.appData.currentClass];
                 window.appData.currentClass = Object.keys(window.appData.classes)[0];
-                saveData();
-                renderClassSelect();
-                renderTable();
-                closeClassModal();
+                window.saveData();
+                window.renderClassSelect();
+                window.renderTable();
+                window.closeClassModal();
             }
-        }
+        };
 
         // --- Student Modal & Excel Logic ---
-        function openStudentModal() {
+        window.openStudentModal = function() {
             document.getElementById('studentModalClassName').textContent = window.appData.currentClass;
             const currentCls = window.appData.classes[window.appData.currentClass];
             
@@ -551,13 +631,13 @@
             document.getElementById('studentListText').value = textLines;
             
             document.getElementById('studentModal').classList.remove('hidden');
-        }
+        };
 
-        function closeStudentModal() {
+        window.closeStudentModal = function() {
             document.getElementById('studentModal').classList.add('hidden');
-        }
+        };
 
-        function saveStudentList() {
+        window.saveStudentList = function() {
             const rawText = document.getElementById('studentListText').value;
             const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
 
@@ -584,13 +664,13 @@
             });
 
             currentCls.students = newStudents;
-            saveData();
-            renderTable();
-            closeStudentModal();
-        }
+            window.saveData();
+            window.renderTable();
+            window.closeStudentModal();
+        };
 
         // Handle Excel / CSV Drag & Drop / Selection
-        function handleFileUpload(e) {
+        window.handleFileUpload = function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
@@ -630,10 +710,10 @@
                 }
             };
             reader.readAsArrayBuffer(file);
-        }
+        };
 
         // Export to CSV
-        function exportCSV() {
+        window.exportCSV = function() {
             const currentCls = window.appData.classes[window.appData.currentClass];
             if (!currentCls) return;
 
@@ -656,7 +736,7 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        }
+        };
     </script>
 </body>
 </html>
