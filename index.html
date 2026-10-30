@@ -204,13 +204,19 @@
 
         // ランダムなIDを自動生成する関数（先生ごとに被らないようにする）
         function generateRandomRoomId() {
-            return 'room-' + Math.random().toString(36).substring(2, 9);
+            return 'room-' + Math.random().toString(36).substring(2, 8);
         }
 
         // URLパラメータからの取得、または保存済みID/新規ランダムIDの自動設定
         const urlParams = new URLSearchParams(window.location.search);
+        let urlRoomId = urlParams.get('room');
         let savedRoomId = localStorage.getItem('attendance_app_room_id');
-        let roomId = urlParams.get('room') || savedRoomId || generateRandomRoomId();
+        
+        // URLにあればそれを優先、なければ保存済みID、それでもなければ新しくランダム生成
+        let roomId = urlRoomId || savedRoomId;
+        if (!roomId || roomId.trim() === '' || roomId === 'null' || roomId === 'undefined') {
+            roomId = generateRandomRoomId();
+        }
         
         // 端末のローカルストレージに自分専用IDとして保持
         localStorage.setItem('attendance_app_room_id', roomId);
