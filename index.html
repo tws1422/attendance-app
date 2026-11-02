@@ -277,12 +277,14 @@ function appendStudentRow(num="",name=""){
     a.min="1";
     a.value=num;
     a.placeholder="番号";
-    a.style.cssText = "width: 70px; flex-shrink: 0;" + "border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 14px;";
+    // 出席番号の幅を最小限にスリム化
+    a.style.cssText = "width: 55px; flex-shrink: 0;" + "border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 14px; text-align: center;";
     
     let b=document.createElement("input");
     b.type="text";
     b.value=name;
     b.placeholder="氏名";
+    // 残りのスペースをすべて氏名欄に割り当てて十分な広さを確保
     b.style.cssText = "flex: 1; min-width: 0;" + "border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 14px;";
     
     let x=document.createElement("button");
