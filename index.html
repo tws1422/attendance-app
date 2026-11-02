@@ -4,7 +4,7 @@
 <style>body{font-family:system-ui,sans-serif}button:disabled{opacity:.45;cursor:not-allowed}</style></head>
 <body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
 <header class="bg-indigo-700 text-white p-4 sticky top-0 z-20"><div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-<h1 class="font-bold text-xl">📚 教務手帳 for iPad</h1><div class="flex flex-wrap items-center gap-2">
+<h1 onclick="goHome()" class="font-bold text-xl cursor-pointer hover:opacity-90">📚 教務手帳 for iPad</h1><div class="flex flex-wrap items-center gap-2">
 <span id="status" class="text-xs bg-yellow-400 text-black rounded px-2 py-1">未ログイン</span><span id="email" class="text-xs"></span>
 <button id="login" onclick="login()" class="bg-white text-indigo-800 rounded px-3 py-2 text-sm">Googleでログイン</button><button id="logout" onclick="logout()" class="hidden bg-indigo-900 rounded px-3 py-2 text-sm">ログアウト</button>
 <div id="yearBox" class="hidden flex gap-1 items-center bg-indigo-900 rounded p-1"><select id="year" onchange="changeYear(this.value)" class="bg-indigo-950 rounded p-1 text-sm"></select><button onclick="addYear()" class="bg-indigo-600 rounded px-2">＋年度</button><button onclick="deleteYear()" class="bg-red-600 rounded px-2">削除</button></div>
@@ -95,6 +95,11 @@ function localSave(){localStorage.setItem("attendance_cache_"+user.uid,JSON.stri
 function queueSave(){if(!loaded||remoteApplying||!editable())return;localSave();status("保存待機中");clearTimeout(saveTimer);saveTimer=setTimeout(save,500)}
 async function save(){if(!loaded||remoteApplying)return;try{await setDoc(ref(),{appData:data,updatedAt:new Date().toISOString()});status("同期完了")}catch(e){console.error(e);status("保存失敗");alert("クラウド保存に失敗しました。Firebaseの設定とセキュリティルールを確認してください。")}}
 function hist(){history.push(copy(data));if(history.length>20)history.shift()}
+
+window.goHome = () => {
+    classId = "";
+    render();
+};
 
 function render(){
     let ys=$("year");ys.innerHTML="";
@@ -277,14 +282,12 @@ function appendStudentRow(num="",name=""){
     a.min="1";
     a.value=num;
     a.placeholder="番号";
-    // 出席番号の幅を最小限にスリム化
     a.style.cssText = "width: 55px; flex-shrink: 0;" + "border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 14px; text-align: center;";
     
     let b=document.createElement("input");
     b.type="text";
     b.value=name;
     b.placeholder="氏名";
-    // 残りのスペースをすべて氏名欄に割り当てて十分な広さを確保
     b.style.cssText = "flex: 1; min-width: 0;" + "border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 14px;";
     
     let x=document.createElement("button");
