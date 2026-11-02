@@ -1,807 +1,95 @@
 <!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>教務手帳 出欠管理Webアプリ</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { font-family: system-ui, -apple-system, sans-serif; }
-    </style>
-</head>
+<html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>教務手帳 出欠管理</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{font-family:system-ui,sans-serif}button:disabled{opacity:.45;cursor:not-allowed}</style></head>
 <body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
-
-    <!-- ヘッダー -->
-    <header class="bg-indigo-700 text-white shadow-md sticky top-0 z-20">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
-            <div class="flex items-center space-x-3">
-                <span class="text-2xl">📚</span>
-                <h1 class="text-xl font-bold">教務手帳 出欠管理</h1>
-                <span id="syncStatusBadge" class="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded-full font-medium">接続中...</span>
-            </div>
-            
-            <div class="flex flex-wrap items-center gap-2 text-sm">
-                <!-- 年度選択 -->
-                <div class="flex items-center bg-indigo-800 rounded px-2 py-1">
-                    <span class="mr-1 text-xs text-indigo-200">年度:</span>
-                    <select id="fiscalYearSelect" class="bg-indigo-900 text-white rounded px-2 py-0.5 text-sm focus:outline-none" onchange="changeFiscalYear(this.value)">
-                    </select>
-                    <button onclick="addNewFiscalYear()" class="ml-1 text-xs bg-indigo-600 hover:bg-indigo-500 px-1.5 py-0.5 rounded" title="新年度を追加">＋</button>
-                </div>
-
-                <!-- 共有ID設定 -->
-                <button onclick="openRoomModal()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded font-medium transition">
-                    🔑 共有ID設定: <span id="currentRoomDisplay" class="font-mono underline">abc123</span>
-                </button>
-
-                <!-- URLコピー -->
-                <button onclick="copyShareUrl()" class="bg-indigo-800 hover:bg-indigo-900 px-2.5 py-1.5 rounded text-xs transition" title="共有URLをコピー">
-                    🔗 共有URLコピー
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- メインコンテンツ -->
-    <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 flex flex-col gap-6">
-
-        <!-- コントロールバー -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-wrap justify-between items-center gap-4">
-            
-            <!-- クラス・科目・操作ボタン -->
-            <div class="flex flex-wrap items-center gap-3">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">表示クラス</label>
-                    <select id="classSelect" class="border rounded-lg px-3 py-2 text-sm font-semibold bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none" onchange="switchClass(this.value)">
-                        <!-- 動的生成 -->
-                    </select>
-                </div>
-
-                <div class="flex items-end gap-2 mt-5 sm:mt-0">
-                    <button onclick="openClassModal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition border">
-                        ⚙️ クラス・科目設定
-                    </button>
-                    <button onclick="openStudentModal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition border">
-                        👤 生徒編集 (Excel読込)
-                    </button>
-                </div>
-            </div>
-
-            <!-- 一括追加・Undo・CSV出力 -->
-            <div class="flex flex-wrap items-end gap-3">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">対象日付</label>
-                    <input type="date" id="targetDateInput" class="border rounded-lg px-3 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                </div>
-                
-                <button onclick="addSelectedDateToChecked()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition">
-                    ＋ チェック生徒に日付追加
-                </button>
-
-                <button onclick="undoLastAction()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-sm transition" title="直前の操作を取り消す">
-                    ↩️ 戻る
-                </button>
-
-                <button onclick="exportCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-sm transition">
-                    📊 CSV出力
-                </button>
-            </div>
-        </div>
-
-        <!-- 科目情報・警告表示エリア -->
-        <div id="classMetaCard" class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex flex-wrap justify-between items-center gap-4">
-            <div>
-                <h2 id="displayClassName" class="text-lg font-bold text-indigo-900">クラス名未設定</h2>
-                <p class="text-sm text-indigo-700">科目: <span id="displaySubjectName">未設定</span> / 単位数: <span id="displayUnits">0</span> 単位 (欠課上限: <span id="displayLimit">0</span>回)</p>
-            </div>
-            <div class="text-xs text-indigo-600 bg-white px-3 py-1.5 rounded-lg border border-indigo-200 shadow-2xs">
-                💡 チェックを入れて日付追加ボタンを押すと、選択した日付が各生徒に記録されます。
-            </div>
-        </div>
-
-        <!-- 生徒出欠一覧テーブル -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-grow flex flex-col">
-            <div class="overflow-x-auto flex-grow">
-                <table class="w-full text-left border-collapse" id="attendanceTable">
-                    <thead class="bg-gray-100 text-gray-600 text-xs uppercase tracking-wider sticky top-0 border-b">
-                        <tr>
-                            <th class="p-3 text-center w-12"><input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)" title="全選択/解除"></th>
-                            <th class="p-3 w-16 text-center">番号</th>
-                            <th class="p-3 min-w-[160px]">氏名</th>
-                            <th class="p-3 w-24 text-center">欠課回数</th>
-                            <th class="p-3 min-w-[350px]">欠課日時（クリックで削除）</th>
-                            <th class="p-3 w-28 text-center">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="studentTableBody" class="divide-y divide-gray-200 text-sm">
-                        <!-- 動的生成 -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
-
-    <!-- フッター -->
-    <footer class="bg-white border-t py-4 text-center text-xs text-gray-500 mt-auto">
-        教務手帳 出欠管理Webアプリ &copy; 2026 - Firebase Realtime Synchronized
-    </footer>
-
-    <!-- ================= MODALS ================= -->
-
-    <!-- クラス・科目設定モーダル -->
-    <div id="classModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl flex flex-col max-h-[90vh]">
-            <h3 class="text-lg font-bold text-gray-900 mb-4">⚙️ クラス・科目設定</h3>
-            <div class="overflow-y-auto flex-grow space-y-4 pr-1">
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">クラス名</label>
-                    <input type="text" id="modalClassName" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="例: 1年1組">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-600 mb-1">科目名</label>
-                        <input type="text" id="modalSubjectName" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="例: 英語コミュニケーションⅡ">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-600 mb-1">単位数</label>
-                        <input type="number" id="modalUnits" class="w-full border rounded-lg px-3 py-2 text-sm" value="2" min="1" max="10">
-                    </div>
-                </div>
-                <hr class="my-2">
-                <div class="flex justify-between items-center pt-2">
-                    <button onclick="addNewClass()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-2 rounded-lg text-sm font-medium transition">
-                        ＋ 新しいクラスを追加
-                    </button>
-                    <button onclick="deleteCurrentClass()" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-sm font-medium transition">
-                        🗑️ このクラスを削除
-                    </button>
-                </div>
-            </div>
-            <div class="mt-6 flex justify-end space-x-3 pt-3 border-t">
-                <button onclick="closeClassModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">キャンセル</button>
-                <button onclick="saveClassModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">保存する</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 生徒編集モーダル (Excel読込対応) -->
-    <div id="studentModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl flex flex-col max-h-[90vh]">
-            <h3 class="text-lg font-bold text-gray-900 mb-2">👤 生徒編集・名簿一括登録</h3>
-            <p class="text-xs text-gray-500 mb-4">Excelの名簿を表計算ソフトからそのままコピーして貼り付けるか、1行ずつ入力してください。</p>
-            
-            <div class="space-y-4 flex-grow overflow-y-auto pr-1">
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">一括貼り付け (Excel / スプレッドシート)</label>
-                    <textarea id="excelPasteArea" rows="4" class="w-full border rounded-lg p-3 text-xs font-mono" placeholder="例:
-1	青木 一郎
-2	井上 花子"></textarea>
-                    <button onclick="parseExcelPaste()" class="mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border px-3 py-1.5 rounded-lg text-xs font-medium">
-                        📋 貼り付けたデータから生徒を反映
-                    </button>
-                </div>
-                
-                <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">生徒一覧 (番号, 氏名)</label>
-                    <div id="studentEditorRows" class="space-y-2 max-h-60 overflow-y-auto border p-3 rounded-lg bg-gray-50">
-                        <!-- 動的生成 -->
-                    </div>
-                    <button onclick="addStudentRow()" class="mt-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-medium">
-                        ＋ 生徒を追加
-                    </button>
-                </div>
-            </div>
-
-            <div class="mt-6 flex justify-end space-x-3 pt-3 border-t">
-                <button onclick="closeStudentModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">キャンセル</button>
-                <button onclick="saveStudentModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">保存する</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 共有ID設定モーダル -->
-    <div id="roomModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-            <h3 class="text-lg font-bold text-gray-900 mb-2">🔑 共有ID設定</h3>
-            <p class="text-xs text-gray-500 mb-4">同じ共有IDを入力したスマホやPC間でデータがリアルタイム同期されます。任意の文字列を指定できます。</p>
-            
-            <div class="space-y-3">
-                <input type="text" id="modalRoomInput" class="w-full border rounded-lg px-3 py-2 text-sm font-mono font-bold" placeholder="例: yamada-class-1a">
-            </div>
-
-            <div class="mt-6 flex justify-end space-x-3 pt-3 border-t">
-                <button onclick="closeRoomModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">キャンセル</button>
-                <button onclick="saveRoomModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">接続を切り替える</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- クラス削除確認モーダル (安全装置) -->
-    <div id="deleteConfirmModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-            <h3 class="text-lg font-bold text-red-600 mb-2">⚠️ クラス削除の確認</h3>
-            <p id="deleteConfirmMessage" class="text-xs text-gray-600 mb-4">本当にこのクラスを削除しますか？この操作は元に戻せません。</p>
-            <div class="mb-4">
-                <label class="block text-xs font-bold text-gray-600 mb-1">確認のため、削除するクラス名を入力してください</label>
-                <input type="text" id="deleteConfirmInput" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="クラス名を入力">
-            </div>
-            <div class="flex justify-end space-x-3 pt-3 border-t">
-                <button onclick="closeDeleteConfirmModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">キャンセル</button>
-                <button onclick="executeDeleteClass()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium">完全に削除する</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Firebase SDK (Modular) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-        // ==========================================
-        // 🛠️ Firebase 設定情報
-        // ==========================================
-        const myFirebaseConfig = {
-            apiKey: "xxxxxxxx",
-            authDomain: "xxxxxxxx.firebaseapp.com",
-            projectId: "xxxxxxxx",
-            storageBucket: "xxxxxxxx",
-            messagingSenderId: "xxxxxxxx",
-            appId: "xxxxxxxx"
-        };
-
-        // アプリ状態
-        let app = null;
-        let db = null;
-        let unsubscribe = null;
-        window.currentRoom = localStorage.getItem("kyomu_room") || "abc123";
-        window.currentFiscalYear = "2026年度";
-        window.currentClassId = null;
-        window.actionHistory = []; // Undo用
-
-        // デフォルトデータ構造
-        let globalData = {
-            "2026年度": {
-                classes: {
-                    "class_1": {
-                        name: "1年1組",
-                        subject: "英語コミュニケーションⅡ",
-                        units: 2,
-                        students: [
-                            { id: 1, number: 1, name: "青木 一郎", absences: [] },
-                            { id: 2, number: 2, name: "井上 花子", absences: [] },
-                            { id: 3, number: 3, name: "佐藤 健太", absences: [] }
-                        ]
-                    }
-                }
-            }
-        };
-
-        // 初期化実行
-        window.addEventListener("DOMContentLoaded", async () => {
-            // URLパラメータ ?room=xxx があれば優先
-            const urlParams = new URLSearchParams(window.location.search);
-            const roomParam = urlParams.get("room");
-            if (roomParam) {
-                window.currentRoom = roomParam;
-                localStorage.setItem("kyomu_room", roomParam);
-            }
-
-            document.getElementById("currentRoomDisplay").textContent = window.currentRoom;
-            document.getElementById("targetDateInput").valueAsDate = new Date();
-
-            // Firebase 初期化
-            try {
-                app = initializeApp(myFirebaseConfig);
-                db = getFirestore(app);
-                const auth = getAuth(app);
-                await signInAnonymously(auth);
-                updateSyncStatus("connected", "クラウド接続中");
-                initCloudSync();
-            } catch (e) {
-                console.warn("Firebase initialization skipped or failed:", e);
-                updateSyncStatus("offline", "ローカルモード");
-                loadLocalStorage();
-                initAppUI();
-            }
-        });
-
-        function updateSyncStatus(status, text) {
-            const badge = document.getElementById("syncStatusBadge");
-            badge.textContent = text;
-            if (status === "connected") {
-                badge.className = "text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full font-medium";
-            } else if (status === "syncing") {
-                badge.className = "text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full font-medium";
-            } else {
-                badge.className = "text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full font-medium";
-            }
-        }
-
-        // リアルタイム同期リスナー
-        function initCloudSync() {
-            if (!db) return;
-            if (unsubscribe) unsubscribe();
-
-            const docRef = doc(db, "rooms", window.currentRoom);
-            unsubscribe = onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data && data.appData) {
-                        globalData = data.appData;
-                        saveLocalStorage();
-                        initAppUI();
-                        updateSyncStatus("connected", "同期完了");
-                    }
-                } else {
-                    // 初回作成時は現在のローカル/デフォルトデータをクラウドに送信
-                    window.syncToCloud();
-                }
-            }, (error) => {
-                console.error("Sync error:", error);
-                updateSyncStatus("offline", "同期エラー");
-            });
-        }
-
-        window.syncToCloud = async function() {
-            if (!db) return;
-            updateSyncStatus("syncing", "同期中...");
-            try {
-                const docRef = doc(db, "rooms", window.currentRoom);
-                await setDoc(docRef, { appData: globalData, updatedAt: new Date().toISOString() });
-                updateSyncStatus("connected", "同期完了");
-            } catch (e) {
-                console.error("Cloud save failed:", e);
-                updateSyncStatus("offline", "保存失敗");
-            }
-        };
-
-        function saveLocalStorage() {
-            localStorage.setItem("kyomu_app_data_" + window.currentRoom, JSON.stringify(globalData));
-        }
-
-        function loadLocalStorage() {
-            const saved = localStorage.getItem("kyomu_app_data_" + window.currentRoom);
-            if (saved) {
-                try {
-                    globalData = JSON.parse(saved);
-                } catch(e) { console.error(e); }
-            }
-        }
-
-        // UI初期化
-        function initAppUI() {
-            renderFiscalYears();
-            renderClassSelect();
-            renderTable();
-        }
-
-        function renderFiscalYears() {
-            const select = document.getElementById("fiscalYearSelect");
-            select.innerHTML = "";
-            const years = Object.keys(globalData).sort().reverse();
-            if (!years.includes(window.currentFiscalYear)) {
-                window.currentFiscalYear = years[0] || "2026年度";
-            }
-            years.forEach(y => {
-                const opt = document.createElement("option");
-                opt.value = y;
-                opt.textContent = y;
-                if (y === window.currentFiscalYear) opt.selected = true;
-                select.appendChild(opt);
-            });
-        }
-
-        window.changeFiscalYear = function(year) {
-            window.currentFiscalYear = year;
-            window.currentClassId = null;
-            renderClassSelect();
-            renderTable();
-        };
-
-        window.addNewFiscalYear = function() {
-            const newYear = prompt("新年度を入力してください（例: 2027年度）:", "2027年度");
-            if (!newYear) return;
-            if (globalData[newYear]) {
-                alert("すでに存在する年度です。");
-                return;
-            }
-            // 前年度のクラス構成を引き継ぐか確認
-            const inherit = confirm("前年度のクラス・科目構成を引き継ぎますか？\n（OKで引き継ぐ、キャンセルで空の年度を作成）");
-            let newClasses = {};
-            if (inherit && globalData[window.currentFiscalYear]) {
-                const prevClasses = globalData[window.currentFiscalYear].classes;
-                for (let cId in prevClasses) {
-                    newClasses[cId] = {
-                        name: prevClasses[cId].name,
-                        subject: prevClasses[cId].subject,
-                        units: prevClasses[cId].units,
-                        students: prevClasses[cId].students.map(s => ({ id: s.id, number: s.number, name: s.name, absences: [] }))
-                    };
-                }
-            } else {
-                const defId = "class_" + Date.now();
-                newClasses[defId] = { name: "1年1組", subject: "科目名未設定", units: 2, students: [] };
-            }
-            globalData[newYear] = { classes: newClasses };
-            window.currentFiscalYear = newYear;
-            window.currentClassId = null;
-            saveLocalStorage();
-            window.syncToCloud();
-            initAppUI();
-        };
-
-        function renderClassSelect() {
-            const select = document.getElementById("classSelect");
-            select.innerHTML = "";
-            const yearData = globalData[window.currentFiscalYear];
-            if (!yearData || !yearData.classes) {
-                globalData[window.currentFiscalYear] = { classes: {} };
-                return;
-            }
-            const classIds = Object.keys(yearData.classes);
-            if (classIds.length === 0) {
-                const defId = "class_" + Date.now();
-                yearData.classes[defId] = { name: "1年1組", subject: "科目名未設定", units: 2, students: [] };
-                window.currentClassId = defId;
-            } else if (!window.currentClassId || !yearData.classes[window.currentClassId]) {
-                window.currentClassId = classIds[0];
-            }
-
-            classIds.forEach(id => {
-                const cls = yearData.classes[id];
-                const opt = document.createElement("option");
-                opt.value = id;
-                opt.textContent = `${cls.name} (${cls.subject || '科目未設定'})`;
-                if (id === window.currentClassId) opt.selected = true;
-                select.appendChild(opt);
-            });
-        }
-
-        window.switchClass = function(classId) {
-            window.currentClassId = classId;
-            renderTable();
-        };
-
-        // Undo記録用
-        function pushHistory() {
-            actionHistory.push(JSON.parse(JSON.stringify(globalData)));
-            if (actionHistory.length > 20) actionHistory.shift();
-        }
-
-        window.undoLastAction = function() {
-            if (actionHistory.length === 0) {
-                alert("戻せる操作履歴がありません。");
-                return;
-            }
-            globalData = actionHistory.pop();
-            saveLocalStorage();
-            window.syncToCloud();
-            initAppUI();
-            alert("直前の操作を取り消しました。");
-        };
-
-        // 一覧テーブル描画
-        window.renderTable = function() {
-            const yearData = globalData[window.currentFiscalYear];
-            if (!yearData || !window.currentClassId) return;
-            const cls = yearData.classes[window.currentClassId];
-            if (!cls) return;
-
-            // メタ情報更新
-            document.getElementById("displayClassName").textContent = cls.name;
-            document.getElementById("displaySubjectName").textContent = cls.subject || "未設定";
-            document.getElementById("displayUnits").textContent = cls.units || 2;
-            const limit = (cls.units || 2) * 5; // 簡易上限目安
-            document.getElementById("displayLimit").textContent = limit;
-
-            const tbody = document.getElementById("studentTableBody");
-            tbody.innerHTML = "";
-
-            if (!cls.students || cls.students.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-400">生徒が登録されていません。「👤 生徒編集（Excel読込）」から追加してください。</td></tr>`;
-                return;
-            }
-
-            cls.students.sort((a, b) => (a.number || 0) - (b.number || 0)).forEach(st => {
-                const tr = document.createElement("tr");
-                tr.className = "hover:bg-gray-50/80 transition";
-
-                const absences = st.absences || [];
-                const count = absences.length;
-                let warningHtml = "";
-                if (count >= limit) {
-                    warningHtml = `<span class="ml-1 text-red-600 font-bold" title="欠課上限超過">‼️</span>`;
-                } else if (count >= limit * 0.8) {
-                    warningHtml = `<span class="ml-1 text-amber-500 font-bold" title="欠課注意">❗️</span>`;
-                }
-
-                // 日付タグ生成 (重複可能)
-                let dateTagsHtml = absences.map((dateStr, idx) => `
-                    <span class="inline-flex items-center bg-gray-100 hover:bg-red-100 text-gray-700 hover:text-red-700 px-2 py-0.5 rounded text-xs border cursor-pointer mr-1 mb-1 transition" onclick="removeDateFromStudent(${st.id}, ${idx})" title="クリックで削除">
-                        ${dateStr} <span class="ml-1 text-gray-400 hover:text-red-500 font-bold">&times;</span>
-                    </span>
-                `).join("");
-
-                tr.innerHTML = `
-                    <td class="p-3 text-center"><input type="checkbox" class="student-checkbox rounded" data-id="${st.id}"></td>
-                    <td class="p-3 text-center font-mono text-gray-600">${st.number}</td>
-                    <td class="p-3 font-semibold text-gray-900">${st.name}</td>
-                    <td class="p-3 text-center font-bold ${count >= limit ? 'text-red-600' : 'text-gray-700'}">${count}${warningHtml}</td>
-                    <td class="p-3"><div class="flex flex-wrap items-center">${dateTagsHtml || '<span class="text-xs text-gray-400">欠課なし</span>'}</div></td>
-                    <td class="p-3 text-center">
-                        <button onclick="addTodayToStudent(${st.id})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded text-xs font-medium border border-indigo-200 transition">今日を追加</button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        };
-
-        window.toggleSelectAll = function(master) {
-            const checkboxes = document.querySelectorAll(".student-checkbox");
-            checkboxes.forEach(cb => cb.checked = master.checked);
-        };
-
-        // 日付追加
-        window.addSelectedDateToChecked = function() {
-            const dateVal = document.getElementById("targetDateInput").value;
-            if (!dateVal) {
-                alert("対象の日付を選択してください。");
-                return;
-            }
-            const checkboxes = document.querySelectorAll(".student-checkbox:checked");
-            if (checkboxes.length === 0) {
-                alert("生徒が選択されていません。");
-                return;
-            }
-
-            pushHistory();
-            const cls = globalData[window.currentFiscalYear].classes[window.currentClassId];
-            checkboxes.forEach(cb => {
-                const sId = parseInt(cb.getAttribute("data-id"));
-                const st = cls.students.find(s => s.id === sId);
-                if (st) {
-                    if (!st.absences) st.absences = [];
-                    st.absences.push(dateVal);
-                    // 年度順・日付順ソート
-                    st.absences.sort();
-                }
-            });
-
-            saveLocalStorage();
-            window.syncToCloud();
-            renderTable();
-        };
-
-        window.addTodayToStudent = function(studentId) {
-            const today = new Date().toISOString().split("T")[0];
-            pushHistory();
-            const cls = globalData[window.currentFiscalYear].classes[window.currentClassId];
-            const st = cls.students.find(s => s.id === studentId);
-            if (st) {
-                if (!st.absences) st.absences = [];
-                st.absences.push(today);
-                st.absences.sort();
-            }
-            saveLocalStorage();
-            window.syncToCloud();
-            renderTable();
-        };
-
-        window.removeDateFromStudent = function(studentId, dateIndex) {
-            pushHistory();
-            const cls = globalData[window.currentFiscalYear].classes[window.currentClassId];
-            const st = cls.students.find(s => s.id === studentId);
-            if (st && st.absences) {
-                st.absences.splice(dateIndex, 1);
-            }
-            saveLocalStorage();
-            window.syncToCloud();
-            renderTable();
-        };
-
-        // CSV出力
-        window.exportCSV = function() {
-            const cls = globalData[window.currentFiscalYear].classes[window.currentClassId];
-            if (!cls) return;
-
-            let csv = "\uFEFF出席番号,氏名,欠課回数,欠課日時一覧\n";
-            cls.students.forEach(st => {
-                const absencesStr = (st.absences || []).join(" ");
-                csv += `"${st.number}","${st.name}",${(st.absences || []).length},"${absencesStr}"\n`;
-            });
-
-            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${cls.name}_${cls.subject}_欠課一覧_${window.currentFiscalYear}.csv`;
-            a.click();
-        };
-
-        // クラス設定モーダル関連
-        window.openClassModal = function() {
-            const cls = globalData[window.currentFiscalYear].classes[window.currentClassId];
-            if (!cls) return;
-            document.getElementById("modalClassName").value = cls.name;
-            document.getElementById("modalSubjectName").value = cls.subject || "";
-            document.getElementById("modalUnits").value = cls.units || 2;
-            document.getElementById("classModal").classList.remove("hidden");
-        };
-        window.closeClassModal = function() { document.getElementById("classModal").classList.add("hidden"); };
-        window.saveClassModal = function() {
-            pushHistory();
-            const cls = globalData[window.currentFiscalYear].classes[window.currentClassId];
-            cls.name = document.getElementById("modalClassName").value;
-            cls.subject = document.getElementById("modalSubjectName").value;
-            cls.units = parseInt(document.getElementById("modalUnits").value) || 2;
-            saveLocalStorage();
-            window.syncToCloud();
-            closeClassModal();
-            initAppUI();
-        };
-
-        window.addNewClass = function() {
-            const name = prompt("新しいクラス名を入力してください（例: 1年2組）:", "1年2組");
-            if (!name) return;
-            pushHistory();
-            const newId = "class_" + Date.now();
-            globalData[window.currentFiscalYear].classes[newId] = {
-                name: name,
-                subject: "科目名未設定",
-                units: 2,
-                students: []
-            };
-            window.currentClassId = newId;
-            saveLocalStorage();
-            window.syncToCloud();
-            closeClassModal();
-            initAppUI();
-        };
-
-        // クラス削除関連（安全確認付き）
-        let classToDelete = null;
-        window.deleteCurrentClass = function() {
-            const yearData = globalData[window.currentFiscalYear];
-            if (Object.keys(yearData.classes).length <= 1) {
-                alert("最後のクラスは削除できません。");
-                return;
-            }
-            const cls = yearData.classes[window.currentClassId];
-            classToDelete = window.currentClassId;
-            document.getElementById("deleteConfirmMessage").textContent = `「${cls.name} (${cls.subject})」を削除します。`;
-            document.getElementById("deleteConfirmInput").value = "";
-            document.getElementById("deleteConfirmModal").classList.remove("hidden");
-        };
-        window.closeDeleteConfirmModal = function() {
-            document.getElementById("deleteConfirmModal").classList.add("hidden");
-            classToDelete = null;
-        };
-        window.executeDeleteClass = function() {
-            const yearData = globalData[window.currentFiscalYear];
-            const cls = yearData.classes[classToDelete];
-            const inputVal = document.getElementById("deleteConfirmInput").value;
-            if (inputVal !== cls.name) {
-                alert("クラス名が一致しません。削除をキャンセルしました。");
-                return;
-            }
-            pushHistory();
-            delete yearData.classes[classToDelete];
-            window.currentClassId = Object.keys(yearData.classes)[0];
-            saveLocalStorage();
-            window.syncToCloud();
-            closeDeleteConfirmModal();
-            initAppUI();
-        };
-
-        // 生徒編集モーダル関連
-        window.openStudentModal = function() {
-            const cls = globalData[window.currentFiscalYear].classes[window.currentClassId];
-            const container = document.getElementById("studentEditorRows");
-            container.innerHTML = "";
-            document.getElementById("excelPasteArea").value = "";
-
-            cls.students.forEach(st => {
-                appendStudentRow(st.number, st.name);
-            });
-            document.getElementById("studentModal").classList.remove("hidden");
-        };
-        window.closeStudentModal = function() { document.getElementById("studentModal").classList.add("hidden"); };
-        
-        function appendStudentRow(num = "", name = "") {
-            const container = document.getElementById("studentEditorRows");
-            const div = document.createElement("div");
-            div.className = "flex items-center gap-2 student-row-item";
-            div.innerHTML = `
-                <input type="number" class="w-20 border rounded px-2 py-1 text-sm st-num" placeholder="番号" value="${num}">
-                <input type="text" class="flex-grow border rounded px-2 py-1 text-sm st-name" placeholder="氏名" value="${name}">
-                <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 px-2 py-1 font-bold">×</button>
-            `;
-            container.appendChild(div);
-        }
-        window.addStudentRow = function() { appendStudentRow("", ""); };
-
-        window.parseExcelPaste = function() {
-            const text = document.getElementById("excelPasteArea").value;
-            if (!text.trim()) return;
-            const lines = text.split("\n");
-            const container = document.getElementById("studentEditorRows");
-            container.innerHTML = "";
-
-            let autoNum = 1;
-            lines.forEach(line => {
-                if (!line.trim()) return;
-                const cols = line.split("\t");
-                if (cols.length >= 2) {
-                    const num = parseInt(cols[0]) || autoNum++;
-                    const name = cols[1].trim();
-                    appendStudentRow(num, name);
-                } else if (cols.length === 1) {
-                    const name = cols[0].trim();
-                    if (name) {
-                        appendStudentRow(autoNum++, name);
-                    }
-                }
-            });
-        };
-
-        window.saveStudentModal = function() {
-            pushHistory();
-            const cls = globalData[window.currentFiscalYear].classes[window.currentClassId];
-            const rows = document.querySelectorAll(".student-row-item");
-            let newStudents = [];
-            let idCounter = 1;
-
-            rows.forEach(r => {
-                const num = parseInt(r.querySelector(".st-num").value) || idCounter;
-                const name = r.querySelector(".st-name").value.trim();
-                if (name) {
-                    // 既存の欠課データを引き継ぐか確認
-                    const existing = cls.students.find(s => s.name === name);
-                    newStudents.push({
-                        id: idCounter++,
-                        number: num,
-                        name: name,
-                        absences: existing ? existing.absences : []
-                    });
-                }
-            });
-
-            cls.students = newStudents;
-            saveLocalStorage();
-            window.syncToCloud();
-            closeStudentModal();
-            renderTable();
-        };
-
-        // 共有ID変更モーダル関連
-        window.openRoomModal = function() {
-            document.getElementById("modalRoomInput").value = window.currentRoom;
-            document.getElementById("roomModal").classList.remove("hidden");
-        };
-        window.closeRoomModal = function() { document.getElementById("roomModal").classList.add("hidden"); };
-        window.saveRoomModal = function() {
-            const newRoom = document.getElementById("modalRoomInput").value.trim();
-            if (!newRoom) {
-                alert("共有IDを入力してください。");
-                return;
-            }
-            window.currentRoom = newRoom;
-            localStorage.setItem("kyomu_room", newRoom);
-            document.getElementById("currentRoomDisplay").textContent = newRoom;
-            closeRoomModal();
-            loadLocalStorage();
-            initCloudSync();
-            alert(`共有IDを「${newRoom}」に変更しました。`);
-        };
-
-        window.copyShareUrl = function() {
-            const url = `${window.location.origin}${window.location.pathname}?room=${window.currentRoom}`;
-            navigator.clipboard.writeText(url).then(() => {
-                alert("共有URLをコピーしました！\n別の端末やブラウザでこのURLを開くと、同じ部屋に接続できます。");
-            });
-        };
-    </script>
-</body>
-</html>
+<header class="bg-indigo-700 text-white p-4 sticky top-0 z-20"><div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+<h1 class="font-bold text-xl">📚 教務手帳 出欠管理</h1><div class="flex flex-wrap items-center gap-2">
+<span id="status" class="text-xs bg-yellow-400 text-black rounded px-2 py-1">未ログイン</span><span id="email" class="text-xs"></span>
+<button id="login" onclick="login()" class="bg-white text-indigo-800 rounded px-3 py-2 text-sm">Googleでログイン</button><button id="logout" onclick="logout()" class="hidden bg-indigo-900 rounded px-3 py-2 text-sm">ログアウト</button>
+<div id="yearBox" class="hidden flex gap-1 items-center bg-indigo-900 rounded p-1"><select id="year" onchange="changeYear(this.value)" class="bg-indigo-950 rounded p-1 text-sm"></select><button onclick="addYear()" class="bg-indigo-600 rounded px-2">＋年度</button><button onclick="deleteYear()" class="bg-red-600 rounded px-2">削除</button></div>
+</div></div></header>
+<main id="main" class="hidden max-w-7xl w-full mx-auto p-4 flex-1 flex-col gap-4">
+<div id="readonly" class="hidden bg-amber-100 border border-amber-300 rounded p-3 text-sm">過去年度は閲覧専用です。CSV出力のみ利用できます。</div>
+<section class="bg-white border rounded-xl p-4 flex flex-wrap justify-between gap-4"><div class="flex flex-wrap items-end gap-3">
+<label class="text-xs">クラス<select id="class" onchange="changeClass(this.value)" class="block border rounded p-2 text-sm"></select></label>
+<button data-edit onclick="openClass()" class="border rounded p-2 text-sm">クラス・科目設定</button><button data-edit onclick="openStudents()" class="border rounded p-2 text-sm">生徒編集・Excel貼付</button></div>
+<div class="flex flex-wrap items-end gap-2"><label class="text-xs">対象日付<input id="date" type="date" class="block border rounded p-2"></label><button data-edit onclick="addSelected()" class="bg-indigo-600 text-white rounded p-2 text-sm">選択生徒に日付追加</button><button data-edit onclick="undo()" class="bg-amber-500 text-white rounded p-2 text-sm">↩ 戻る</button><button onclick="csv()" class="bg-emerald-600 text-white rounded p-2 text-sm">CSV出力</button></div></section>
+<section class="bg-indigo-50 border border-indigo-100 rounded-xl p-4"><h2 id="className" class="font-bold text-lg">—</h2><p class="text-sm">科目: <span id="subject">—</span> / 単位数: <span id="units">—</span> / 欠課上限目安: <span id="limit">—</span>回</p></section>
+<section class="bg-white border rounded-xl overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-100"><tr><th class="p-3"><input type="checkbox" id="all" onchange="selectAll(this)"></th><th class="p-3">番号</th><th class="p-3 text-left">氏名</th><th class="p-3">欠課回数</th><th class="p-3 text-left">欠課日（クリックで削除）</th><th class="p-3">操作</th></tr></thead><tbody id="rows"></tbody></table></section>
+</main>
+<div id="loginMessage" class="m-auto p-8 text-center"><div class="text-4xl">🔐</div><h2 class="font-bold text-xl my-2">Googleアカウントでログインしてください</h2><p class="text-sm text-gray-600">@g.kagawa-edu.jp の確認済みアカウントを使用してください。</p></div>
+<footer class="text-center text-xs text-gray-500 bg-white border-t p-3">教務手帳 出欠管理Webアプリ</footer>
+
+<div id="classModal" class="hidden fixed inset-0 bg-black/50 z-30 items-center justify-center p-4"><div class="bg-white rounded-xl p-5 w-full max-w-lg"><h3 class="font-bold mb-3">クラス・科目設定</h3><label class="block text-sm mb-2">クラス名<input id="cname" class="border rounded p-2 w-full"></label><label class="block text-sm mb-2">科目名<input id="csubject" class="border rounded p-2 w-full"></label><label class="block text-sm mb-3">単位数<input id="cunits" type="number" min="1" max="10" class="border rounded p-2 w-full"></label><div class="flex justify-between"><button onclick="newClass()" class="border rounded p-2 text-sm">＋クラス追加</button><button onclick="removeClass()" class="border border-red-300 text-red-600 rounded p-2 text-sm">クラス削除</button></div><div class="flex justify-end gap-2 mt-4"><button onclick="hide('classModal')" class="bg-gray-100 rounded p-2">キャンセル</button><button onclick="saveClass()" class="bg-indigo-600 text-white rounded p-2">保存</button></div></div></div>
+<div id="studentModal" class="hidden fixed inset-0 bg-black/50 z-30 items-center justify-center p-4"><div class="bg-white rounded-xl p-5 w-full max-w-2xl max-h-[90vh] flex flex-col"><h3 class="font-bold mb-2">生徒編集</h3><p class="text-xs text-gray-500 mb-2">Excelから出席番号と氏名の2列をコピーして貼り付けます。</p><textarea id="paste" rows="4" class="border rounded p-2 text-sm" placeholder="1&#9;青木 一郎&#10;2&#9;井上 花子"></textarea><button onclick="parsePaste()" class="self-start border rounded p-2 my-2 text-sm">貼付データを反映</button><div id="studentRows" class="overflow-y-auto flex-1 space-y-2"></div><button onclick="addStudent()" class="self-start border rounded p-2 my-2 text-sm">＋生徒追加</button><div class="flex justify-end gap-2"><button onclick="hide('studentModal')" class="bg-gray-100 rounded p-2">キャンセル</button><button onclick="saveStudents()" class="bg-indigo-600 text-white rounded p-2">保存</button></div></div></div>
+<div id="confirmModal" class="hidden fixed inset-0 bg-black/50 z-40 items-center justify-center p-4"><div class="bg-white rounded-xl p-5 w-full max-w-md"><h3 class="font-bold text-red-600 mb-2">削除確認</h3><p id="confirmText" class="text-sm mb-3"></p><input id="confirmInput" class="border rounded p-2 w-full" placeholder="対象名を入力"><div class="flex justify-end gap-2 mt-4"><button onclick="hide('confirmModal')" class="bg-gray-100 rounded p-2">キャンセル</button><button onclick="confirmDelete()" class="bg-red-600 text-white rounded p-2">削除する</button></div></div></div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import{getFirestore,doc,getDoc,setDoc,onSnapshot}from"https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+/* Firebase Consoleのプロジェクト設定に表示される値を入力 */
+const config={apiKey:"AIzaSyD-KJ1Yx5Pim-HIq5Vt0xvAuQbltZfBTKg",authDomain:"kyoumu-attendance.firebaseapp.com",projectId:"kyoumu-attendance",storageBucket:"kyoumu-attendance.firebasestorage.app",messagingSenderId:"35065093867",appId:"1:35065093867:web:4dbb92e25eedeb3da828ae"};
+const DOMAIN="g.kagawa-edu.jp",fb=initializeApp(config),db=getFirestore(fb),auth=getAuth(fb),provider=new GoogleAuthProvider();
+provider.setCustomParameters({hd:DOMAIN,prompt:"select_account"});
+let user=null,data=null,year="",classId="",stop=null,history=[],loaded=false,pendingDelete=null,saveTimer=null,remoteApplying=false;
+const $=id=>document.getElementById(id),copy=x=>JSON.parse(JSON.stringify(x));
+const today=()=>{let d=new Date();d=new Date(d.getTime()-d.getTimezoneOffset()*60000);return d.toISOString().slice(0,10)};
+function status(t){$("status").textContent=t}
+function defaultData(){return{schemaVersion:2,years:{"2026年度":{classes:{class_1:{name:"1年1組",subject:"科目名未設定",units:2,students:[]}}}}}}
+function normalize(d){if(!d||typeof d!=="object")return defaultData();if(!d.years){let ys={};for(let[k,v]of Object.entries(d))if(v?.classes)ys[k]=v;d={years:ys}}if(!Object.keys(d.years||{}).length)return defaultData();for(let yd of Object.values(d.years)){yd.classes??={};for(let[id,c]of Object.entries(yd.classes)){c.name??=id;c.subject??="科目名未設定";c.units=Number(c.units)||2;c.students=(c.students||[]).map((s,i)=>({id:Number(s.id)||i+1,number:Number(s.number??s.no)||i+1,name:String(s.name||""),absences:s.absences||s.dates||[]}))}}return d}
+function yrNum(s){return Number((String(s).match(/\d{4}/)||[])[0])||0}
+function latest(){return Object.keys(data.years).sort((a,b)=>yrNum(b)-yrNum(a)||b.localeCompare(a,"ja"))[0]}
+function yd(){return data?.years?.[year]}
+function cls(){return yd()?.classes?.[classId]}
+function readonly(){return !!data&&year!==latest()}
+function editable(){if(readonly()){alert("過去年度は閲覧専用です。現年度を選択してください。");return false}return true}
+function ref(){return doc(db,"users",user.uid,"attendance","main")}
+function localSave(){localStorage.setItem("attendance_cache_"+user.uid,JSON.stringify(data))}
+function queueSave(){if(!loaded||remoteApplying||!editable())return;localSave();status("保存待機中");clearTimeout(saveTimer);saveTimer=setTimeout(save,500)}
+async function save(){if(!loaded||remoteApplying)return;try{await setDoc(ref(),{appData:data,updatedAt:new Date().toISOString()});status("同期完了")}catch(e){console.error(e);status("保存失敗");alert("クラウド保存に失敗しました。Firebaseの設定とセキュリティルールを確認してください。")}}
+function hist(){history.push(copy(data));if(history.length>20)history.shift()}
+function render(){let ys=$("year");ys.innerHTML="";Object.keys(data.years).sort((a,b)=>yrNum(b)-yrNum(a)).forEach(y=>{let o=new Option(y,y);o.selected=y===year;ys.add(o)});let cs=$("class");cs.innerHTML="";let ids=Object.keys(yd()?.classes||{});if(!ids.length){classId="";}else{if(!yd().classes[classId])classId=ids[0];ids.forEach(id=>{let c=yd().classes[id],o=new Option(`${c.name}（${c.subject}）`,id);o.selected=id===classId;cs.add(o)})}
+let c=cls();$("className").textContent=c?.name||"クラス未登録";$("subject").textContent=c?.subject||"—";$("units").textContent=c?.units??"—";$("limit").textContent=c?c.units*5:"—";$("rows").innerHTML="";
+if(c){[...c.students].sort((a,b)=>a.number-b.number).forEach(s=>{let tr=document.createElement("tr");tr.className="border-t hover:bg-gray-50";let td=document.createElement("td");td.className="p-3 text-center";let cb=document.createElement("input");cb.type="checkbox";cb.className="student-check";cb.dataset.id=s.id;cb.disabled=readonly();td.append(cb);tr.append(td);
+for(let val of [s.number]){let x=document.createElement("td");x.className="p-3 text-center";x.textContent=val;tr.append(x)}
+let n=document.createElement("td");n.className="p-3 font-semibold";n.textContent=s.name;tr.append(n);
+let count=document.createElement("td");count.className="p-3 text-center font-bold";count.textContent=s.absences.length;tr.append(count);
+let dates=document.createElement("td");dates.className="p-3";s.absences.forEach((d,i)=>{let b=document.createElement("button");b.className="bg-gray-100 border rounded px-2 py-1 m-0.5 text-xs";b.textContent=d+" ×";b.disabled=readonly();b.onclick=()=>removeDate(s.id,i);dates.append(b)});if(!s.absences.length)dates.textContent="欠課なし";tr.append(dates);
+let op=document.createElement("td");op.className="p-3 text-center";let b=document.createElement("button");b.textContent="今日を追加";b.className="bg-indigo-50 border text-indigo-700 rounded px-2 py-1 text-xs";b.disabled=readonly();b.onclick=()=>addToday(s.id);op.append(b);tr.append(op);$("rows").append(tr)})}
+$("readonly").classList.toggle("hidden",!readonly());document.querySelectorAll("[data-edit]").forEach(b=>b.disabled=readonly());$("date").disabled=readonly();$("all").disabled=readonly();$("all").checked=false}
+window.login=async()=>{try{await signInWithPopup(auth,provider)}catch(e){if(["auth/popup-blocked","auth/operation-not-supported-in-this-environment"].includes(e.code))await signInWithRedirect(auth,provider);else alert("ログインできませんでした: "+e.message)}};
+window.logout=async()=>{if(stop)stop();await signOut(auth);location.reload()};
+async function session(u){if(!u.emailVerified||!u.email?.toLowerCase().endsWith("@"+DOMAIN)){alert("@g.kagawa-edu.jp の確認済みアカウントでログインしてください。");await signOut(auth);return}
+user=u;$("email").textContent=u.email;$("login").classList.add("hidden");$("logout").classList.remove("hidden");$("loginMessage").classList.add("hidden");$("main").classList.remove("hidden");$("main").classList.add("flex");$("yearBox").classList.remove("hidden");status("読み込み中");loaded=false;if(stop)stop();
+try{let snap=await getDoc(ref());if(snap.exists()&&snap.data().appData)data=normalize(snap.data().appData);else{data=defaultData();loaded=true;await setDoc(ref(),{appData:data,updatedAt:new Date().toISOString()})}year=latest();classId="";loaded=true;history=[];localSave();render();status("同期完了");
+stop=onSnapshot(ref(),s=>{if(!s.exists()||!s.data().appData)return;remoteApplying=true;data=normalize(s.data().appData);if(!data.years[year])year=latest();if(!yd()?.classes?.[classId])classId="";render();localSave();remoteApplying=false;status("同期完了")},e=>{console.error(e);status("同期エラー")});
+}catch(e){console.error(e);status("読込失敗");alert("データを読み込めません。Firebase設定・認証・セキュリティルールを確認してください。")}}
+onAuthStateChanged(auth,u=>{if(u)session(u);else{$("login").classList.remove("hidden");$("logout").classList.add("hidden");$("main").classList.add("hidden");$("loginMessage").classList.remove("hidden");$("email").textContent="";status("未ログイン")}});
+getRedirectResult(auth).catch(console.error);
+window.changeYear=y=>{if(data.years[y]){year=y;classId="";render()}};
+window.changeClass=id=>{classId=id;render()};
+window.addYear=()=>{if(!editable())return;let y=prompt("新年度を入力してください:",(yrNum(latest())+1)+"年度");if(!y?.trim())return;y=y.trim();if(data.years[y])return alert("すでに存在する年度です。");let source=yd(),classes={};if(source)Object.entries(source.classes).forEach(([id,c])=>{classes["class_"+crypto.randomUUID()]={name:c.name,subject:c.subject,units:c.units,students:[]}});if(!Object.keys(classes).length)classes["class_"+crypto.randomUUID()]={name:"1年1組",subject:"科目名未設定",units:2,students:[]};hist();data.years[y]={classes};year=y;classId="";render();queueSave();alert("クラス名・科目名・単位数を引き継ぎ、生徒名簿と欠課記録は空にしました。")};
+window.deleteYear=()=>{if(Object.keys(data.years).length<2)return alert("最後の年度は削除できません。");let y=year;if(prompt(`年度「${y}」を完全に削除します。確認のため年度名を入力してください。`)!==y)return alert("年度名が一致しません。");if(!confirm(`${y}の全データを削除します。元に戻せません。よろしいですか？`))return;hist();delete data.years[y];year=latest();classId="";render();queueSave()};
+window.selectAll=m=>document.querySelectorAll(".student-check").forEach(c=>c.checked=m.checked);
+window.addSelected=()=>{if(!editable())return;let d=$("date").value,selected=[...document.querySelectorAll(".student-check:checked")];if(!d)return alert("日付を選択してください。");if(!selected.length)return alert("生徒を選択してください。");hist();selected.forEach(cb=>{let s=cls().students.find(x=>x.id===Number(cb.dataset.id));if(s)s.absences.push(d)});render();queueSave()};
+window.addToday=id=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.push(localToday());render();queueSave()};
+function localToday(){let d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
+window.removeDate=(id,i)=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.splice(i,1);render();queueSave()};
+window.undo=()=>{if(!editable())return;if(!history.length)return alert("戻せる操作履歴がありません。");data=history.pop();render();queueSave()};
+window.csv=()=>{let c=cls();if(!c)return;let q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';let out="\uFEFF年度,"+q(year)+"\r\nクラス,"+q(c.name)+"\r\n科目,"+q(c.subject)+"\r\n単位数,"+c.units+"\r\n\r\n出席番号,氏名,欠課回数,欠課日\r\n";c.students.forEach(s=>out+=[q(s.number),q(s.name),s.absences.length,q(s.absences.join(" "))].join(",")+"\r\n");let a=document.createElement("a"),u=URL.createObjectURL(new Blob([out],{type:"text/csv;charset=utf-8"}));a.href=u;a.download=`出欠記録_${year}_${c.name}.csv`;a.click();URL.revokeObjectURL(u)};
+window.openClass=()=>{if(!editable())return;let c=cls();if(!c)return;$("cname").value=c.name;$("csubject").value=c.subject;$("cunits").value=c.units;show("classModal")};
+window.saveClass=()=>{if(!editable())return;let c=cls(),n=$("cname").value.trim(),s=$("csubject").value.trim(),u=Number($("cunits").value);if(!n||!s||!Number.isInteger(u)||u<1||u>10)return alert("クラス名・科目名・単位数を正しく入力してください。");hist();c.name=n;c.subject=s;c.units=u;hide("classModal");render();queueSave()};
+window.newClass=()=>{if(!editable())return;let n=prompt("新しいクラス名:");if(!n?.trim())return;if(Object.values(yd().classes).some(c=>c.name===n.trim()))return alert("同じクラス名があります。");hist();classId="class_"+crypto.randomUUID();yd().classes[classId]={name:n.trim(),subject:"科目名未設定",units:2,students:[]};hide("classModal");render();queueSave()};
+window.removeClass=()=>{if(!editable())return;if(Object.keys(yd().classes).length<=1)return alert("最後のクラスは削除できません。");pendingDelete={type:"class",id:classId,name:cls().name};$("confirmText").textContent="クラスの生徒名簿と欠課記録も削除されます。";$("confirmInput").value="";show("confirmModal")};
+window.confirmDelete=()=>{if(!pendingDelete)return;if($("confirmInput").value!==pendingDelete.name)return alert("入力した名前が一致しません。");hist();if(pendingDelete.type==="class"){delete yd().classes[pendingDelete.id];classId=""}hide("confirmModal");hide("classModal");pendingDelete=null;render();queueSave()};
+window.openStudents=()=>{if(!editable())return;$("paste").value="";$("studentRows").innerHTML="";cls().students.forEach(s=>studentRow(s.number,s.name));show("studentModal")};
+function studentRow(num="",name=""){let row=document.createElement("div");row.className="flex gap-2 student-row";let a=document.createElement("input");a.type="number";a.min="1";a.value=num;a.placeholder="番号";a.className="num border rounded p-2 w-20";let b=document.createElement("input");b.value=name;b.placeholder="氏名";b.className="name border rounded p-2 flex-1";let x=document.createElement("button");x.textContent="×";x.className="text-red-600 px-2";x.onclick=()=>row.remove();row.append(a,b,x);$("studentRows").append(row)}
+window.addStudent=()=>studentRow();
+window.parsePaste=()=>{let t=$("paste").value.trim();if(!t)return;$("studentRows").innerHTML="";t.split(/\r?\n/).forEach((line,i)=>{let a=line.split("\t");studentRow(a.length>1?(Number(a[0])||i+1):i+1,a.length>1?a.slice(1).join(" ").trim():a[0].trim())})};
+window.saveStudents=()=>{if(!editable())return;let used=new Set(),arr=[];for(let[i,r]of [...document.querySelectorAll(".student-row")].entries()){let n=Number(r.querySelector(".num").value)||i+1,name=r.querySelector(".name").value.trim();if(!name)continue;if(used.has(n))return alert(`出席番号${n}が重複しています。`);used.add(n);let old=cls().students.find(s=>s.name===name);arr.push({id:i+1,number:n,name,absences:old?[...old.absences]:[]})}hist();cls().students=arr;hide("studentModal");render();queueSave()};
+window.show=id=>{$(id).classList.remove("hidden");$(id).classList.add("flex")};window.hide=id=>{$(id).classList.add("hidden");$(id).classList.remove("flex")};
+$("date").value=localToday();
+</script></body></html>
