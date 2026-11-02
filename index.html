@@ -19,7 +19,7 @@
 <div id="actionControls" class="flex flex-wrap items-end gap-2 hidden">
 <label class="text-xs">対象日付
     <div class="flex items-center gap-1 mt-1">
-        <input id="date" type="text" placeholder="YYYY-MM-DD" class="border rounded p-2 bg-white text-sm w-36 text-center">
+        <input id="date" type="text" placeholder="2026-05-01" class="border rounded p-2 bg-white text-sm w-36 text-center">
         <button type="button" onclick="setTodayDate()" class="bg-gray-100 border rounded px-2.5 py-2 text-xs hover:bg-gray-200">今日</button>
     </div>
 </label>
@@ -210,7 +210,19 @@ function render(){
 
             let op=document.createElement("td");op.className="p-3 text-center whitespace-nowrap flex items-center justify-center gap-1.5";
             let b1=document.createElement("button");b1.textContent="本日の欠課を追加";b1.className="bg-indigo-50 border text-indigo-700 rounded px-2 py-1 text-xs";b1.disabled=readonly();b1.onclick=()=>addToday(s.id);
-            let b2=document.createElement("input");b2.type="date";b2.className="border rounded p-1 text-xs bg-white cursor-pointer";b2.disabled=readonly();b2.title="過去の欠課日を追加";b2.onchange=(e)=>{if(e.target.value)addDateToStudent(s.id,e.target.value);e.target.value="";};
+            
+            // 各生徒ごとの過去日追加用も安全なテキスト入力に変更
+            let b2=document.createElement("input");
+            b2.type="text";
+            b2.placeholder="MM-DD";
+            b2.className="border rounded p-1 text-xs bg-white w-20 text-center";
+            b2.disabled=readonly();
+            b2.title="過去の欠課日を追加（例: 05-01）";
+            b2.onchange=(e)=>{
+                let parsed = parseDateInput(e.target.value);
+                if(parsed) addDateToStudent(s.id, parsed);
+                e.target.value = "";
+            };
             op.append(b1,b2);tr.append(op);
             $("rows").append(tr);
         });
