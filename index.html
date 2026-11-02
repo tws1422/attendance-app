@@ -113,7 +113,6 @@ function render(){
     let hasClass = classId && classesObj[classId];
 
     if(!hasClass){
-        // クラス未選択時の表示
         $("noClassSelected").classList.remove("hidden");
         $("noClassSelected").classList.add("flex");
         $("classContentArea").classList.add("hidden");
@@ -121,7 +120,6 @@ function render(){
         $("btnStudentModal").classList.add("hidden");
         $("actionControls").classList.add("hidden");
     } else {
-        // クラス選択時の表示
         $("noClassSelected").classList.add("hidden");
         $("noClassSelected").classList.remove("flex");
         $("classContentArea").classList.remove("hidden");
@@ -136,6 +134,9 @@ function render(){
         $("units").textContent=c?.units??"—";
         $("rows").innerHTML="";
 
+        // 簡易上限目安: 単位数×5回（例: 2単位なら10回、など。全授業回数の目安）
+        let totalLimit = (c.units || 2) * 5;
+
         [...c.students].sort((a,b)=>a.number-b.number).forEach(s=>{
             let tr=document.createElement("tr");tr.className="border-t hover:bg-gray-50";
             let td=document.createElement("td");td.className="p-3 text-center";
@@ -143,7 +144,21 @@ function render(){
             
             let x=document.createElement("td");x.className="p-3 text-center";x.textContent=s.number;tr.append(x);
             let n=document.createElement("td");n.className="p-3 font-semibold";n.textContent=s.name;tr.append(n);
-            let count=document.createElement("td");count.className="p-3 text-center font-bold";count.textContent=s.absences.length;tr.append(count);
+            
+            let absencesCount = s.absences.length;
+            let remaining = totalLimit - absencesCount; // 残り許容欠課数
+
+            let count=document.createElement("td");
+            count.className="p-3 text-center font-bold";
+            count.textContent = absencesCount;
+
+            // 欠課残数が残り10時間未満で黄色（❗️）、5時間未満で赤（‼️）
+            if(remaining < 5){
+                count.innerHTML += ` <span class="text-red-600" title="欠課残り5時間未満 (危険)">‼️</span>`;
+            }else if(remaining < 10){
+                count.innerHTML += ` <span class="text-amber-500" title="欠課残り10時間未満 (注意)">❗️</span>`;
+            }
+            tr.append(count);
             
             let dates=document.createElement("td");dates.className="p-3";
             s.absences.forEach((d,i)=>{
