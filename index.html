@@ -82,7 +82,7 @@ const today=()=>{let d=new Date();d=new Date(d.getTime()-d.getTimezoneOffset()*6
 const formatDateDisplay=d=>(d&&d.length>=10)?d.slice(5):d;
 
 function status(t){$("status").textContent=t}
-function defaultData(){return{schemaVersion:2,years:{"2026年度":{classes:{}}}}}}
+function defaultData(){return{schemaVersion:2,years:{"2026年度":{classes:{}}}}}
 function normalize(d){if(!d||typeof d!=="object")return defaultData();if(!d.years){let ys={};for(let[k,v]of Object.entries(d))if(v?.classes)ys[k]=v;d={years:ys}}if(!Object.keys(d.years||{}).length)return defaultData();for(let yd of Object.values(d.years)){yd.classes??={};for(let[id,c]of Object.entries(yd.classes)){c.name??=id;c.subject??="科目名未設定";c.units=Number(c.units)||2;c.students=(c.students||[]).map((s,i)=>({id:Number(s.id)||i+1,number:Number(s.number??s.no)||i+1,name:String(s.name||""),absences:s.absences||s.dates||[]}))}}return d}
 function yrNum(s){return Number((String(s).match(/\d{4}/)||[])[0])||0}
 function latest(){return Object.keys(data.years).sort((a,b)=>yrNum(b)-yrNum(a)||b.localeCompare(a,"ja"))[0]}
@@ -134,7 +134,6 @@ function render(){
         $("units").textContent=c?.units??"—";
         $("rows").innerHTML="";
 
-        // 簡易上限目安: 単位数×5回（例: 2単位なら10回、など。全授業回数の目安）
         let totalLimit = (c.units || 2) * 5;
 
         [...c.students].sort((a,b)=>a.number-b.number).forEach(s=>{
@@ -146,13 +145,12 @@ function render(){
             let n=document.createElement("td");n.className="p-3 font-semibold";n.textContent=s.name;tr.append(n);
             
             let absencesCount = s.absences.length;
-            let remaining = totalLimit - absencesCount; // 残り許容欠課数
+            let remaining = totalLimit - absencesCount;
 
             let count=document.createElement("td");
             count.className="p-3 text-center font-bold";
             count.textContent = absencesCount;
 
-            // 欠課残数が残り10時間未満で黄色（❗️）、5時間未満で赤（‼️）
             if(remaining < 5){
                 count.innerHTML += ` <span class="text-red-600" title="欠課残り5時間未満 (危険)">‼️</span>`;
             }else if(remaining < 10){
