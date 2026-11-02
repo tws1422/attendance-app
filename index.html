@@ -17,7 +17,7 @@
 <label class="text-xs">クラス<select id="class" onchange="changeClass(this.value)" class="block border rounded p-2 text-sm"><option value="">（クラスを選択してください）</option></select></label>
 <button id="btnClassModal" data-edit onclick="openClass()" class="border rounded p-2 text-sm hidden">クラス・科目設定</button><button id="btnStudentModal" data-edit onclick="openStudents()" class="border rounded p-2 text-sm hidden">生徒編集・Excel貼付</button></div>
 <div id="actionControls" class="flex flex-wrap items-end gap-2 hidden">
-<label class="text-xs">対象日付<input id="date" type="date" class="block border rounded p-2"></label>
+<label class="text-xs">対象日付<input id="date" type="date" class="block border rounded p-2 bg-white"></label>
 <button data-edit onclick="addSelected()" class="bg-indigo-600 text-white rounded p-2 text-sm">選択生徒に日付追加</button>
 <button data-edit onclick="undo()" class="bg-amber-500 text-white rounded p-2 text-sm">↩ 戻る</button>
 <button onclick="csv()" class="bg-emerald-600 text-white rounded p-2 text-sm">CSV出力</button>
@@ -77,6 +77,8 @@ const config={apiKey:"AIzaSyD-KJ1Yx5Pim-HIq5Vt0xvAuQbltZfBTKg",authDomain:"kyoum
 const DOMAIN="g.kagawa-edu.jp",fb=initializeApp(config),db=getFirestore(fb),auth=getAuth(fb),provider=new GoogleAuthProvider();
 provider.setCustomParameters({hd:DOMAIN,prompt:"select_account"});
 let user=null,data=null,year="",classId="",stop=null,history=[],loaded=false,pendingDelete=null,saveTimer=null,remoteApplying=false;
+let dateManuallySelected = false; // 日付が明示的に選択されたかどうかを管理
+
 const $=id=>document.getElementById(id),copy=x=>JSON.parse(JSON.stringify(x));
 const today=()=>{let d=new Date();d=new Date(d.getTime()-d.getTimezoneOffset()*60000);return d.toISOString().slice(0,10)};
 const formatDateDisplay=d=>(d&&d.length>=10)?d.slice(5):d;
@@ -146,7 +148,6 @@ function render(){
 
             let tr=document.createElement("tr");
             
-            // 欠課数に応じた背景色（12以上:濃い赤、7以上:薄い赤、2以上:黄色）
             if(absencesCount >= 12){
                 tr.className="border-t bg-red-200 hover:bg-red-300 font-semibold";
             }else if(absencesCount >= 7){
@@ -177,7 +178,7 @@ function render(){
 
             let op=document.createElement("td");op.className="p-3 text-center whitespace-nowrap flex items-center justify-center gap-1.5";
             let b1=document.createElement("button");b1.textContent="本日の欠課を追加";b1.className="bg-indigo-50 border text-indigo-700 rounded px-2 py-1 text-xs";b1.disabled=readonly();b1.onclick=()=>addToday(s.id);
-            let b2=document.createElement("input");b2.type="date";b2.className="border rounded p-1 text-xs bg-gray-50 cursor-pointer";b2.disabled=readonly();b2.title="過去の欠課日を追加";b2.onchange=(e)=>{if(e.target.value)addDateToStudent(s.id,e.target.value);e.target.value="";};
+            let b2=document.createElement("input");b2.type="date";b2.className="border rounded p-1 text-xs bg-white cursor-pointer";b2.disabled=readonly();b2.title="過去の欠課日を追加";b2.onchange=(e)=>{if(e.target.value)addDateToStudent(s.id,e.target.value);e.target.value="";};
             op.append(b1,b2);tr.append(op);
             $("rows").append(tr);
         });
@@ -206,11 +207,28 @@ window.addYear=()=>{if(!editable())return;let y=prompt("新年度を入力して
 window.deleteYear=()=>{if(Object.keys(data.years).length<2)return alert("最後の年度は削除できません。");let y=year;pendingDelete={type:"year",id:y,name:y};$("confirmText").textContent=`年度「${y}」の全データを削除します。元に戻せません。よろしいですか？`;show("confirmModal")};
 window.selectAll=m=>document.querySelectorAll(".student-check").forEach(c=>c.checked=m.checked);
 
-window.addSelected=()=>{if(!editable())return;let d=$("date").value,selected=[...document.querySelectorAll(".student-check:checked")];if(!d)return alert("日付を選択してください。");if(!selected.length)return alert("生徒を選択してください。");hist();selected.forEach(cb=>{let s=cls().students.find(x=>x.id===Number(cb.dataset.id));if(s){s.absences.push(d);s.absences.sort()}});render();queueSave()};
+window.addSelected=()=>{
+    if(!editable())return;
+    let d=$("date").value;
+    if(!dateManuallySelected || !d) {
+        alert("対象の日付が選択されていません。カレンダーから日付を選んでください。");
+        return;
+    }
+    let selected=[...document.querySelectorAll(".student-check:checked")];
+    if(!selected.length)return alert("生徒を選択してください。");
+    hist();
+    selected.forEach(cb=>{let s=cls().students.find(x=>x.id===Number(cb.dataset.id));if(s){s.absences.push(d);s.absences.sort()}});
+    render();
+    // 追加後は日付選択状態をリセット
+    $("date").value="";
+    dateManuallySelected = false;
+    queueSave();
+};
+
 window.addToday=id=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.push(localToday());s.absences.sort();render();queueSave()};
 window.addDateToStudent=(id,d)=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.push(d);s.absences.sort();render();queueSave()};
 function localToday(){let d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
-window.removeDate=(id,i)=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.splice(i,1);render();queueSave()};
+window.removeDate=(id,i)=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);id;if(!s)return;hist();s.absences.splice(i,1);render();queueSave()};
 window.undo=()=>{if(!editable())return;if(!history.length)return alert("戻せる操作履歴がありません。");data=history.pop();render();queueSave()};
 window.csv=()=>{let c=cls();if(!c)return;let q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';let out="\uFEFF年度,"+q(year)+"\r\nクラス,"+q(c.name)+"\r\n科目,"+q(c.subject)+"\r\n単位数,"+c.units+"\r\n\r\n出席番号,氏名,欠課回数,欠課日\r\n";c.students.forEach(s=>out+=[q(s.number),q(s.name),s.absences.length,q(s.absences.join(" "))].join(",")+"\r\n");let a=document.createElement("a"),u=URL.createObjectURL(new Blob([out],{type:"text/csv;charset=utf-8"}));a.href=u;a.download=`出欠記録_${year}_${c.name}.csv`;a.click();URL.revokeObjectURL(u)};
 
@@ -336,5 +354,13 @@ window.saveStudents=()=>{
 
 window.show=id=>{$(id).classList.remove("hidden");$(id).classList.add("flex")};
 window.hide=id=>{$(id).classList.add("hidden");$(id).classList.remove("flex")};
-$("date").value=localToday();
+
+// 初期状態では日付を空（未選択）にして、勝手に今日が選ばれないようにする
+const dateInput = $("date");
+dateInput.value = "";
+dateInput.addEventListener("change", () => {
+    if(dateInput.value) {
+        dateManuallySelected = true;
+    }
+});
 </script></body></html>
