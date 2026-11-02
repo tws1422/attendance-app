@@ -25,18 +25,22 @@
 
 <div id="studentModal" class="hidden fixed inset-0 bg-black/50 z-30 items-center justify-center p-4">
     <div class="bg-white rounded-xl p-5 w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div class="flex justify-between items-center mb-2">
+        <div class="flex flex-wrap justify-between items-center mb-2 gap-2">
             <h3 class="font-bold">生徒編集</h3>
-            <button onclick="downloadTemplate()" class="bg-emerald-50 border border-emerald-300 text-emerald-700 rounded px-2.5 py-1 text-xs font-medium hover:bg-emerald-100 transition">📥 テンプレート(CSV)をダウンロード</button>
+            <div class="flex gap-2">
+                <button onclick="downloadTemplate()" class="bg-gray-50 border text-gray-700 rounded px-2.5 py-1 text-xs font-medium hover:bg-gray-100 transition">📥 テンプレートDL</button>
+                <label class="bg-emerald-50 border border-emerald-300 text-emerald-700 rounded px-2.5 py-1 text-xs font-medium hover:bg-emerald-100 transition cursor-pointer">
+                    📂 CSVを読み込む<input type="file" id="csvFile" accept=".csv" class="hidden" onchange="loadCSVFile(this)">
+                </label>
+            </div>
         </div>
-        <p class="text-xs text-gray-500 mb-2">Excelから出席番号と氏名の2列をコピーして貼り付けます。</p>
+        <p class="text-xs text-gray-500 mb-2">Excelから出席番号と氏名の2列をコピーして貼り付けるか、CSVファイルを読み込んでください。</p>
         <textarea id="paste" rows="4" class="border rounded p-2 text-sm" placeholder="1&#9;青木 一郎&#10;2&#9;井上 花子"></textarea>
-        <button onclick="parsePaste()" class="self-start border rounded p-2 my-2 text-sm bg-gray-50 hover:bg-gray-100">貼付データを反映</button>
         <div id="studentRows" class="overflow-y-auto flex-1 space-y-2 border-t border-b py-2 my-2"></div>
-        <button onclick="addStudent()" class="self-start border rounded p-2 my-2 text-sm bg-gray-50 hover:bg-gray-100">＋生徒追加</button>
+        <button onclick="addStudent()" class="self-start border rounded p-2 my-1 text-sm bg-gray-50 hover:bg-gray-100">＋生徒追加</button>
         <div class="flex justify-end gap-2 mt-2">
             <button onclick="hide('studentModal')" class="bg-gray-100 rounded p-2 text-sm">キャンセル</button>
-            <button onclick="saveStudents()" class="bg-indigo-600 text-white rounded p-2 text-sm">保存</button>
+            <button onclick="saveStudents()" class="bg-indigo-600 text-white rounded p-2 text-sm">保存する</button>
         </div>
     </div>
 </div>
@@ -78,8 +82,12 @@ for(let val of [s.number]){let x=document.createElement("td");x.className="p-3 t
 let n=document.createElement("td");n.className="p-3 font-semibold";n.textContent=s.name;tr.append(n);
 let count=document.createElement("td");count.className="p-3 text-center font-bold";count.textContent=s.absences.length;tr.append(count);
 let dates=document.createElement("td");dates.className="p-3";s.absences.forEach((d,i)=>{let b=document.createElement("button");b.className="bg-gray-100 border rounded px-2 py-1 m-0.5 text-xs";b.textContent=formatDateDisplay(d)+" ×";b.disabled=readonly();b.onclick=()=>removeDate(s.id,i);dates.append(b)});if(!s.absences.length)dates.textContent="欠課なし";tr.append(dates);
-let op=document.createElement("td");op.className="p-3 text-center";let b=document.createElement("button");b.textContent="今日を追加";b.className="bg-indigo-50 border text-indigo-700 rounded px-2 py-1 text-xs";b.disabled=readonly();b.onclick=()=>addToday(s.id);op.append(b);tr.append(op);$("rows").append(tr)})}
+let op=document.createElement("td");op.className="p-3 text-center whitespace-nowrap flex items-center justify-center gap-1.5";
+let b1=document.createElement("button");b1.textContent="本日の欠課を追加";b1.className="bg-indigo-50 border text-indigo-700 rounded px-2 py-1 text-xs";b1.disabled=readonly();b1.onclick=()=>addToday(s.id);
+let b2=document.createElement("input");b2.type="date";b2.className="border rounded p-1 text-xs bg-gray-50 cursor-pointer";b2.disabled=readonly();b2.title="過去の欠課日を追加";b2.onchange=(e)=>{if(e.target.value)addDateToStudent(s.id,e.target.value);e.target.value="";};
+op.append(b1,b2);tr.append(op);$("rows").append(tr)})}
 $("readonly").classList.toggle("hidden",!readonly());document.querySelectorAll("[data-edit]").forEach(b=>b.disabled=readonly());$("date").disabled=readonly();$("all").disabled=readonly();$("all").checked=false}
+
 window.login=async()=>{try{await signInWithPopup(auth,provider)}catch(e){if(["auth/popup-blocked","auth/operation-not-supported-in-this-environment"].includes(e.code))await signInWithRedirect(auth,provider);else alert("ログインできませんでした: "+e.message)}};
 window.logout=async()=>{if(stop)stop();await signOut(auth);location.reload()};
 async function session(u){if(!u.emailVerified||!u.email?.toLowerCase().endsWith("@"+DOMAIN)){alert("@g.kagawa-edu.jp の確認済みアカウントでログインしてください。");await signOut(auth);return}
@@ -94,26 +102,96 @@ window.changeClass=id=>{classId=id;render()};
 window.addYear=()=>{if(!editable())return;let y=prompt("新年度を入力してください:",(yrNum(latest())+1)+"年度");if(!y?.trim())return;y=y.trim();if(data.years[y])return alert("すでに存在する年度です。");let source=yd(),classes={};if(source)Object.entries(source.classes).forEach(([id,c])=>{classes["class_"+crypto.randomUUID()]={name:c.name,subject:c.subject,units:c.units,students:[]}});if(!Object.keys(classes).length)classes["class_"+crypto.randomUUID()]={name:"1年1組",subject:"科目名未設定",units:2,students:[]};hist();data.years[y]={classes};year=y;classId="";render();queueSave();alert("クラス名・科目名・単位数を引き継ぎ、生徒名簿と欠課記録は空にしました。")};
 window.deleteYear=()=>{if(Object.keys(data.years).length<2)return alert("最後の年度は削除できません。");let y=year;pendingDelete={type:"year",id:y,name:y};$("confirmText").textContent=`年度「${y}」の全データを削除します。元に戻せません。よろしいですか？`;show("confirmModal")};
 window.selectAll=m=>document.querySelectorAll(".student-check").forEach(c=>c.checked=m.checked);
-window.addSelected=()=>{if(!editable())return;let d=$("date").value,selected=[...document.querySelectorAll(".student-check:checked")];if(!d)return alert("日付を選択してください。");if(!selected.length)return alert("生徒を選択してください。");hist();selected.forEach(cb=>{let s=cls().students.find(x=>x.id===Number(cb.dataset.id));if(s)s.absences.push(d)});render();queueSave()};
-window.addToday=id=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.push(localToday());render();queueSave()};
+window.addSelected=()=>{if(!editable())return;let d=$("date").value,selected=[...document.querySelectorAll(".student-check:checked")];if(!d)return alert("日付を選択してください。");if(!selected.length)return alert("生徒を選択してください。");hist();selected.forEach(cb=>{let s=cls().students.find(x=>x.id===Number(cb.dataset.id));if(s){s.absences.push(d);s.absences.sort()}});render();queueSave()};
+window.addToday=id=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.push(localToday());s.absences.sort();render();queueSave()};
+window.addDateToStudent=(id,d)=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.push(d);s.absences.sort();render();queueSave()};
 function localToday(){let d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
 window.removeDate=(id,i)=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.splice(i,1);render();queueSave()};
 window.undo=()=>{if(!editable())return;if(!history.length)return alert("戻せる操作履歴がありません。");data=history.pop();render();queueSave()};
 window.csv=()=>{let c=cls();if(!c)return;let q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';let out="\uFEFF年度,"+q(year)+"\r\nクラス,"+q(c.name)+"\r\n科目,"+q(c.subject)+"\r\n単位数,"+c.units+"\r\n\r\n出席番号,氏名,欠課回数,欠課日\r\n";c.students.forEach(s=>out+=[q(s.number),q(s.name),s.absences.length,q(s.absences.join(" "))].join(",")+"\r\n");let a=document.createElement("a"),u=URL.createObjectURL(new Blob([out],{type:"text/csv;charset=utf-8"}));a.href=u;a.download=`出欠記録_${year}_${c.name}.csv`;a.click();URL.revokeObjectURL(u)};
 
-// 名簿テンプレートのダウンロード機能
 window.downloadTemplate=()=>{let out="\uFEFF出席番号,氏名\r\n1,青木 一郎\r\n2,井上 花子\r\n3,佐藤 健太\r\n";let a=document.createElement("a"),u=URL.createObjectURL(new Blob([out],{type:"text/csv;charset=utf-8"}));a.href=u;a.download=`生徒名簿テンプレート.csv`;a.click();URL.revokeObjectURL(u)};
+
+window.loadCSVFile=(input)=>{
+    let file=input.files[0];if(!file)return;
+    let reader=new FileReader();
+    reader.onload=(e)=>{
+        let text=e.target.result;
+        let lines=text.split(/\r?\n/);
+        let container=$("studentRows");
+        container.innerHTML="";
+        let start=0;
+        // ヘッダー行のスキップ判定
+        if(lines.length>0&&(lines[0].includes("番号")||lines[0].includes("氏名")||lines[0].includes("出席")))start=1;
+        let autoNum=1;
+        for(let i=start;i<lines.length;i++){
+            let line=lines[i].trim();
+            if(!line)continue;
+            let cols=line.split(",");
+            if(cols.length>=2){
+                let num=parseInt(cols[0].replace(/"/g,""))||autoNum++;
+                let name=cols[1].replace(/"/g,"").trim();
+                appendStudentRow(num,name);
+            }else if(cols.length===1){
+                let name=cols[0].replace(/"/g,"").trim();
+                if(name)appendStudentRow(autoNum++,name);
+            }
+        }
+        input.value="";
+    };
+    reader.readAsText(file,"UTF-8");
+};
 
 window.openClass=()=>{if(!editable())return;let c=cls();if(!c)return;$("cname").value=c.name;$("csubject").value=c.subject;$("cunits").value=c.units;show("classModal")};
 window.saveClass=()=>{if(!editable())return;let c=cls(),n=$("cname").value.trim(),s=$("csubject").value.trim(),u=Number($("cunits").value);if(!n||!s||!Number.isInteger(u)||u<1||u>10)return alert("クラス名・科目名・単位数を正しく入力してください。");hist();c.name=n;c.subject=s;c.units=u;hide("classModal");render();queueSave()};
 window.newClass=()=>{if(!editable())return;let n=prompt("新しいクラス名:");if(!n?.trim())return;if(Object.values(yd().classes).some(c=>c.name===n.trim()))return alert("同じクラス名があります。");hist();classId="class_"+crypto.randomUUID();yd().classes[classId]={name:n.trim(),subject:"科目名未設定",units:2,students:[]};hide("classModal");render();queueSave()};
 window.removeClass=()=>{if(!editable())return;if(Object.keys(yd().classes).length<=1)return alert("最後のクラスは削除できません。");pendingDelete={type:"class",id:classId,name:cls().name};$("confirmText").textContent=`「${cls().name}（${cls().subject}）」の生徒名簿と欠課記録を削除します。よろしいですか？`;show("confirmModal")};
 window.confirmDelete=()=>{if(!pendingDelete)return;hist();if(pendingDelete.type==="class"){delete yd().classes[pendingDelete.id];classId=""}else if(pendingDelete.type==="year"){delete data.years[pendingDelete.id];year=latest();classId=""}hide("confirmModal");hide("classModal");pendingDelete=null;render();queueSave()};
-window.openStudents=()=>{if(!editable())return;$("paste").value="";$("studentRows").innerHTML="";cls().students.forEach(s=>studentRow(s.number,s.name));show("studentModal")};
-function studentRow(num="",name=""){let row=document.createElement("div");row.className="flex gap-2 student-row";let a=document.createElement("input");a.type="number";a.min="1";a.value=num;a.placeholder="番号";a.className="num border rounded p-2 w-20";let b=document.createElement("input");b.value=name;b.placeholder="氏名";b.className="name border rounded p-2 flex-1";let x=document.createElement("button");x.textContent="×";x.className="text-red-600 px-2";x.onclick=()=>row.remove();row.append(a,b,x);$("studentRows").append(row)}
-window.addStudent=()=>studentRow();
-window.parsePaste=()=>{let t=$("paste").value.trim();if(!t)return;$("studentRows").innerHTML="";t.split(/\r?\n/).forEach((line,i)=>{let a=line.split("\t");studentRow(a.length>1?(Number(a[0])||i+1):i+1,a.length>1?a.slice(1).join(" ").trim():a[0].trim())})};
-window.saveStudents=()=>{if(!editable())return;let used=new Set(),arr=[];for(let[i,r]of [...document.querySelectorAll(".student-row")].entries()){let n=Number(r.querySelector(".num").value)||i+1,name=r.querySelector(".name").value.trim();if(!name)continue;if(used.has(n))return alert(`出席番号${n}が重複しています。`);used.add(n);let old=cls().students.find(s=>s.name===name);arr.push({id:i+1,number:n,name,absences:old?[...old.absences]:[]})}hist();cls().students=arr;hide("studentModal");render();queueSave()};
-window.show=id=>{$(id).classList.remove("hidden");$(id).classList.add("flex")};window.hide=id=>{$(id).classList.add("hidden");$(id).classList.remove("flex")};
+
+window.openStudents=()=>{
+    if(!editable())return;
+    $("paste").value="";
+    let container=$("studentRows");
+    container.innerHTML="";
+    cls().students.forEach(s=>appendStudentRow(s.number,s.name));
+    show("studentModal");
+};
+function appendStudentRow(num="",name=""){let row=document.createElement("div");row.className="flex gap-2 student-row";let a=document.createElement("input");a.type="number";a.min="1";a.value=num;a.placeholder="番号";a.className="num border rounded p-2 w-20";let b=document.createElement("input");b.value=name;b.placeholder="氏名";b.className="name border rounded p-2 flex-1";let x=document.createElement("button");x.textContent="×";x.className="text-red-600 px-2 font-bold";x.onclick=()=>row.remove();row.append(a,b,x);$("studentRows").append(row)}
+window.addStudent=()=>appendStudentRow();
+
+window.saveStudents=()=>{
+    if(!editable())return;
+    let pasteText=$("paste").value.trim();
+    if(pasteText){
+        pasteText.split(/\r?\n/).forEach((line,i)=>{
+            if(!line.trim())return;
+            let cols=line.split("\t");
+            if(cols.length>=2){
+                appendStudentRow(parseInt(cols[0])||(i+1),cols.slice(1).join(" ").trim());
+            }else if(cols.length===1){
+                let name=cols[0].trim();
+                if(name)appendStudentRow(i+1,name);
+            }
+        });
+        $("paste").value="";
+    }
+    let used=new Set(),arr=[];
+    for(let[i,r]of [...document.querySelectorAll(".student-row")].entries()){
+        let n=Number(r.querySelector(".num").value)||(i+1),name=r.querySelector(".name").value.trim();
+        if(!name)continue;
+        if(used.has(n))return alert(`出席番号${n}が重複しています。`);
+        used.add(n);
+        let old=cls().students.find(s=>s.name===name);
+        arr.push({id:i+1,number:n,name,absences:old?[...old.absences]:[]});
+    }
+    hist();
+    cls().students=arr;
+    hide("studentModal");
+    render();
+    queueSave();
+};
+
+window.show=id=>{$(id).classList.remove("hidden");$(id).classList.add("flex")};
+window.hide=id=>{$(id).classList.add("hidden");$(id).classList.remove("flex")};
 $("date").value=localToday();
 </script></body></html>
