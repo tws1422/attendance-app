@@ -403,4 +403,29 @@ window.saveStudents=()=>{
             if(cols.length>=2){
                 appendStudentRow(parseInt(cols[0])||(i+1),cols.slice(1).join(" ").trim());
             }else if(cols.length===1){
-                let
+                let name=cols[0].trim();
+                if(name)appendStudentRow(i+1,name);
+            }
+        });
+        $("paste").value="";
+    }
+    let used=new Set(),arr=[];
+    for(let[i,r]of [...document.querySelectorAll("#studentRows > div")].entries()){
+        let inputs = r.querySelectorAll("input");
+        let n=Number(inputs[0].value)||(i+1),name=inputs[1].value.trim();
+        if(!name)continue;
+        if(used.has(n))return alert(`出席番号${n}が重複しています。`);
+        used.add(n);
+        let old=cls().students.find(s=>s.name===name);
+        arr.push({id:i+1,number:n,name,absences:old?[...old.absences]:[]});
+    }
+    hist();
+    cls().students=arr;
+    hide("studentModal");
+    render();
+    queueSave();
+};
+
+window.show=id=>{$(id).classList.remove("hidden");$(id).classList.add("flex")};
+window.hide=id=>{$(id).classList.add("hidden");$(id).classList.remove("flex")};
+</script></body></html>
