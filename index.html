@@ -19,7 +19,7 @@
 <div id="actionControls" class="flex flex-wrap items-end gap-2 hidden">
 <label class="text-xs">対象日付
     <div class="flex items-center gap-1 mt-1">
-        <input id="date" type="text" placeholder="2026-05-01" class="border rounded p-2 bg-white text-sm w-36 text-center">
+        <input id="date" type="text" placeholder="例: 1010 または 10-10" class="border rounded p-2 bg-white text-sm w-40 text-center">
         <button type="button" onclick="setTodayDate()" class="bg-gray-100 border rounded px-2.5 py-2 text-xs hover:bg-gray-200">今日</button>
     </div>
 </label>
@@ -112,21 +112,32 @@ window.setTodayDate = () => {
     $("date").value = localToday();
 };
 
+// 入力された文字列を解析して「YYYY-MM-DD」形式に変換する強力なパーサー
 function parseDateInput(str) {
     str = str.trim();
     if (!str) return "";
-    let currentYear = new Date().getFullYear();
-    // 「MM-DD」や「MM/DD」形式で入力された場合、自動で今年を補完
-    if (/^\d{1,2}[-\/]\d{1,2}$/.test(str)) {
-        let parts = str.split(/[-\/]/);
+    let currentYear = yrNum(year) || new Date().getFullYear();
+
+    // 1. 「1010」（数字4桁）と入力された場合
+    if (/^\d{4}$/.test(str)) {
+        let m = str.slice(0, 2);
+        let d = str.slice(2, 4);
+        return `${currentYear}-${m}-${d}`;
+    }
+
+    // 2. 「10-10」や「10/10」、「10.10」形式の場合
+    if (/^\d{1,2}[-\/\.]\d{1,2}$/.test(str)) {
+        let parts = str.split(/[-\/\.]/);
         let m = parts[0].padStart(2, '0');
         let d = parts[1].padStart(2, '0');
         return `${currentYear}-${m}-${d}`;
     }
-    // 「YYYY-MM-DD」形式
-    if (/^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/.test(str)) {
-        return str.replace(/\//g, '-');
+
+    // 3. すでに「YYYY-MM-DD」形式に近い場合
+    if (/^\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}$/.test(str)) {
+        return str.replace(/[\/\.]/g, '-');
     }
+
     return str;
 }
 
@@ -211,13 +222,12 @@ function render(){
             let op=document.createElement("td");op.className="p-3 text-center whitespace-nowrap flex items-center justify-center gap-1.5";
             let b1=document.createElement("button");b1.textContent="本日の欠課を追加";b1.className="bg-indigo-50 border text-indigo-700 rounded px-2 py-1 text-xs";b1.disabled=readonly();b1.onclick=()=>addToday(s.id);
             
-            // 各生徒ごとの過去日追加用も安全なテキスト入力に変更
             let b2=document.createElement("input");
             b2.type="text";
-            b2.placeholder="MM-DD";
-            b2.className="border rounded p-1 text-xs bg-white w-20 text-center";
+            b2.placeholder="1010等";
+            b2.className="border rounded p-1 text-xs bg-white w-16 text-center";
             b2.disabled=readonly();
-            b2.title="過去の欠課日を追加（例: 05-01）";
+            b2.title="過去の欠課日を追加（例: 1010 または 10-10）";
             b2.onchange=(e)=>{
                 let parsed = parseDateInput(e.target.value);
                 if(parsed) addDateToStudent(s.id, parsed);
@@ -231,7 +241,6 @@ function render(){
     $("readonly").classList.toggle("hidden",!readonly());
     document.querySelectorAll("[data-edit]").forEach(b=>b.disabled=readonly());
     
-    // 初期状態は空（勝手に入力されないようにする）
     $("date").value = "";
     $("date").disabled = readonly();
 
@@ -260,7 +269,7 @@ window.addSelected=()=>{
     let rawVal = $("date").value;
     let d = parseDateInput(rawVal);
     if(!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        alert("日付が正しく入力されていません。「今日」ボタンを押すか、例（2026-05-01 または 05-01）の形式で入力してください。");
+        alert("日付の形式が正しくありません。「1010」または「10-10」のように入力するか、「今日」ボタンを押してください。");
         return;
     }
     let selected=[...document.querySelectorAll(".student-check:checked")];
@@ -345,6 +354,7 @@ window.openStudents=()=>{
     $("paste").value="";
     let container=$("studentRows");
     container.innerHTML="";
+    cls().students.students?.forEach?.(s=>appendStudentRow(s.number,s.name)); // safety
     cls().students.forEach(s=>appendStudentRow(s.number,s.name));
     show("studentModal");
 };
