@@ -33,7 +33,7 @@
 
 <!-- クラス情報・テーブルエリア（初期は非表示） -->
 <div id="classContentArea" class="hidden flex flex-col gap-4 flex-1">
-<section class="bg-indigo-50 border border-indigo-100 rounded-xl p-4"><h2 id="className" class="font-bold text-lg">—</h2><p class="text-sm">科目: <span id="subject">—</span> / 単位数: <span id="units">—</span>単位</p></section>
+<section class="bg-indigo-50 border border-indigo-100 rounded-xl p-4"><h2 id="className" class="font-bold text-lg">—</h2><p class="text-sm">科目: <span id="subject">—</span> / 単位数: <span id="units">—</span>単位 (年間総時数目安: <span id="totalLimitHours">—</span>時間)</p></section>
 <section class="bg-white border rounded-xl overflow-x-auto flex-1"><table class="w-full text-sm"><thead class="bg-gray-100"><tr><th class="p-3"><input type="checkbox" id="all" onchange="selectAll(this)"></th><th class="p-3">番号</th><th class="p-3 text-left">氏名</th><th class="p-3">欠課回数</th><th class="p-3 text-left">欠課日（クリックで削除）</th><th class="p-3">操作</th></tr></thead><tbody id="rows"></tbody></table></section>
 </div>
 </main>
@@ -131,24 +131,27 @@ function render(){
         let c=cls();
         $("className").textContent=c?.name||"クラス未登録";
         $("subject").textContent=c?.subject||"—";
-        $("units").textContent=c?.units??"—";
-        $("rows").innerHTML="";
+        let units = c?.units || 2;
+        $("units").textContent=units;
 
-        let totalLimit = (c.units || 2) * 5;
+        // 1単位＝12時間として年間総時数を算出（例: 2単位なら24時間）
+        let totalLimitHours = units * 12;
+        $("totalLimitHours").textContent = totalLimitHours;
+        $("rows").innerHTML="";
 
         [...c.students].sort((a,b)=>a.number-b.number).forEach(s=>{
             let absencesCount = s.absences.length;
-            let remaining = totalLimit - absencesCount; // 残り許容欠課数
+            let remaining = totalLimitHours - absencesCount; // 残り時数
 
             let tr=document.createElement("tr");
             
-            // 残り時間に応じた行の背景色を設定
+            // 残り時間に応じた行の背景色を設定（0未満：赤、5未満：薄赤、10未満：黄色）
             if(remaining < 0){
-                tr.className="border-t bg-red-100 hover:bg-red-200"; // 残り0未満（赤色）
+                tr.className="border-t bg-red-100 hover:bg-red-200";
             }else if(remaining < 5){
-                tr.className="border-t bg-red-50 hover:bg-red-100";  // 残り5時間未満（薄めの赤）
+                tr.className="border-t bg-red-50 hover:bg-red-100";
             }else if(remaining < 10){
-                tr.className="border-t bg-amber-50 hover:bg-amber-100"; // 残り10時間未満（黄色）
+                tr.className="border-t bg-amber-50 hover:bg-amber-100";
             }else{
                 tr.className="border-t hover:bg-gray-50";
             }
@@ -157,7 +160,6 @@ function render(){
             let cb=document.createElement("input");cb.type="checkbox";cb.className="student-check";cb.dataset.id=s.id;cb.disabled=readonly();td.append(cb);tr.append(td);
             
             let x=document.createElement("td");x.className="p-3 text-center";x.textContent=s.number;tr.append(x);
-            
             let n=document.createElement("td");n.className="p-3 font-semibold";n.textContent=s.name;tr.append(n);
             
             let count=document.createElement("td");
