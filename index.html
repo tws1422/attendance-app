@@ -19,7 +19,7 @@
 <div id="actionControls" class="flex flex-wrap items-end gap-2 hidden">
 <label class="text-xs">対象日付
     <div class="flex items-center gap-1 mt-1">
-        <input id="date" type="text" placeholder="例: 1010 または 10-10" class="border rounded p-2 bg-white text-sm w-40 text-center">
+        <input id="date" type="text" placeholder="例: mmdd または mm-dd" class="border rounded p-2 bg-white text-sm w-40 text-center">
         <button type="button" onclick="setTodayDate()" class="bg-gray-100 border rounded px-2.5 py-2 text-xs hover:bg-gray-200">今日</button>
     </div>
 </label>
@@ -126,14 +126,14 @@ function parseDateInput(str) {
     if (!str) return "";
     let currentYear = yrNum(year) || new Date().getFullYear();
 
-    // 1. 「1010」（数字4桁）と入力された場合
+    // 1. 「mmdd」（数字4桁）と入力された場合
     if (/^\d{4}$/.test(str)) {
         let m = str.slice(0, 2);
         let d = str.slice(2, 4);
         return `${currentYear}-${m}-${d}`;
     }
 
-    // 2. 「10-10」や「10/10」、「10.10」形式の場合
+    // 2. 「mm-dd」や「mm/dd」、「mm.dd」形式の場合
     if (/^\d{1,2}[-\/\.]\d{1,2}$/.test(str)) {
         let parts = str.split(/[-\/\.]/);
         let m = parts[0].padStart(2, '0');
@@ -232,10 +232,10 @@ function render(){
             
             let b2=document.createElement("input");
             b2.type="text";
-            b2.placeholder="1010等";
+            b2.placeholder="mmdd等";
             b2.className="border rounded p-1 text-xs bg-white w-16 text-center";
             b2.disabled=readonly();
-            b2.title="過去の欠課日を追加（例: 1010 または 10-10）";
+            b2.title="過去の欠課日を追加（例: mmdd または mm-dd）";
             b2.onchange=(e)=>{
                 let parsed = parseDateInput(e.target.value);
                 if(parsed) addDateToStudent(s.id, parsed);
@@ -277,7 +277,7 @@ window.addSelected=()=>{
     let rawVal = $("date").value;
     let d = parseDateInput(rawVal);
     if(!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        alert("日付の形式が正しくありません。「1010」または「10-10」のように入力するか、「今日」ボタンを押してください。");
+        alert("日付の形式が正しくありません。「mmdd」または「mm-dd」のように入力するか、「今日」ボタンを押してください。");
         return;
     }
     let selected=[...document.querySelectorAll(".student-check:checked")];
