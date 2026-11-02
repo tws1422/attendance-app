@@ -33,7 +33,7 @@
 
 <!-- クラス情報・テーブルエリア（初期は非表示） -->
 <div id="classContentArea" class="hidden flex flex-col gap-4 flex-1">
-<section class="bg-indigo-50 border border-indigo-100 rounded-xl p-4"><h2 id="className" class="font-bold text-lg">—</h2><p class="text-sm">科目: <span id="subject">—</span> / 単位数: <span id="units">—</span>単位 (年間総時数目安: <span id="totalLimitHours">—</span>時間)</p></section>
+<section class="bg-indigo-50 border border-indigo-100 rounded-xl p-4"><h2 id="className" class="font-bold text-lg">—</h2><p class="text-sm">科目: <span id="subject">—</span> / 単位数: <span id="units">—</span></p></section>
 <section class="bg-white border rounded-xl overflow-x-auto flex-1"><table class="w-full text-sm"><thead class="bg-gray-100"><tr><th class="p-3"><input type="checkbox" id="all" onchange="selectAll(this)"></th><th class="p-3">番号</th><th class="p-3 text-left">氏名</th><th class="p-3">欠課回数</th><th class="p-3 text-left">欠課日（クリックで削除）</th><th class="p-3">操作</th></tr></thead><tbody id="rows"></tbody></table></section>
 </div>
 </main>
@@ -55,7 +55,7 @@
             </div>
         </div>
         <p class="text-xs text-gray-500 mb-2">Excelから出席番号と氏名の2列をコピーして貼り付けるか、CSVファイルを読み込んでください。</p>
-        <textarea id="paste" rows="4" class="border rounded p-2 text-sm" placeholder="1&#9;青木 一郎&#10;2&#9;井上 花子"></textarea>
+        <textarea id="paste" rows="3" class="border rounded p-2 text-sm" placeholder="1&#9;青木 一郎&#10;2&#9;井上 花子"></textarea>
         <div id="studentRows" class="overflow-y-auto flex-1 space-y-2 border-t border-b py-2 my-2 pr-1"></div>
         <button onclick="addStudent()" class="self-start border rounded p-2 my-1 text-sm bg-gray-50 hover:bg-gray-100">＋生徒追加</button>
         <div class="flex justify-end gap-2 mt-2">
@@ -134,13 +134,10 @@ function render(){
         let units = c?.units || 2;
         $("units").textContent=units;
 
-        let totalLimitHours = units * 12;
-        $("totalLimitHours").textContent = totalLimitHours;
         $("rows").innerHTML="";
 
         [...c.students].sort((a,b)=>a.number-b.number).forEach(s=>{
             let absencesCount = s.absences.length;
-            let remaining = totalLimitHours - absencesCount; // 残り時数
 
             let tr=document.createElement("tr");
             
@@ -260,7 +257,7 @@ window.newClass=()=>{
     queueSave();
 };
 
-window.removeClass=()=>{if(!editable())return;if(!classId)return;pendingDelete={type:"class",id:classId,name:cls().name};$("confirmText").textContent=``+cls().name+`（`+cls().subject+`）の生徒名簿と欠課記録を削除します。よろしいですか？`;show("confirmModal")};
+window.removeClass=()=>{if(!editable())return;if(!classId)return;pendingDelete={type:"class",id:classId,name:cls().name};$("confirmText").textContent=`「${cls().name}（${cls().subject}）」の生徒名簿と欠課記録を削除します。よろしいですか？`;show("confirmModal")};
 window.confirmDelete=()=>{if(!pendingDelete)return;hist();if(pendingDelete.type==="class"){delete yd().classes[pendingDelete.id];classId=""}else if(pendingDelete.type==="year"){delete data.years[pendingDelete.id];year=latest();classId=""}hide("confirmModal");hide("classModal");pendingDelete=null;render();queueSave()};
 
 window.openStudents=()=>{
@@ -273,21 +270,27 @@ window.openStudents=()=>{
 };
 function appendStudentRow(num="",name=""){
     let row=document.createElement("div");
-    row.className="flex items-center gap-2 student-row flex-nowrap";
+    row.style.cssText = "display: flex; flex-direction: row; align-items: center; gap: 8px; width: 100%; margin-bottom: 6px;";
+    
     let a=document.createElement("input");
     a.type="number";
     a.min="1";
     a.value=num;
     a.placeholder="番号";
-    a.className="num border rounded p-2 w-20 flex-shrink-0";
+    a.style.cssText = "width: 70px; flex-shrink: 0;" + "border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 14px;";
+    
     let b=document.createElement("input");
+    b.type="text";
     b.value=name;
     b.placeholder="氏名";
-    b.className="name border rounded p-2 flex-1 min-w-0";
+    b.style.cssText = "flex: 1; min-width: 0;" + "border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; font-size: 14px;";
+    
     let x=document.createElement("button");
+    x.type="button";
     x.textContent="×";
-    x.className="text-red-600 px-2 font-bold flex-shrink-0 hover:bg-red-50 rounded";
+    x.style.cssText = "flex-shrink: 0; color: #dc2626; font-weight: bold; padding: 4px 10px; border-radius: 6px; background: none; border: none; cursor: pointer;";
     x.onclick=()=>row.remove();
+    
     row.append(a,b,x);
     $("studentRows").append(row);
 }
@@ -310,8 +313,9 @@ window.saveStudents=()=>{
         $("paste").value="";
     }
     let used=new Set(),arr=[];
-    for(let[i,r]of [...document.querySelectorAll(".student-row")].entries()){
-        let n=Number(r.querySelector(".num").value)||(i+1),name=r.querySelector(".name").value.trim();
+    for(let[i,r]of [...document.querySelectorAll("#studentRows > div")].entries()){
+        let inputs = r.querySelectorAll("input");
+        let n=Number(inputs[0].value)||(i+1),name=inputs[1].value.trim();
         if(!name)continue;
         if(used.has(n))return alert(`出席番号${n}が重複しています。`);
         used.add(n);
