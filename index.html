@@ -18,9 +18,9 @@
 <button id="btnClassModal" data-edit onclick="openClass()" class="border rounded p-2 text-sm hidden">クラス・科目設定</button><button id="btnStudentModal" data-edit onclick="openStudents()" class="border rounded p-2 text-sm hidden">生徒編集・Excel貼付</button></div>
 <div id="actionControls" class="flex flex-wrap items-end gap-2 hidden">
 <label class="text-xs">対象日付
-    <div class="relative inline-block ml-1">
-        <input id="dateDisplay" type="text" value="日付を選択..." readonly onclick="activateDatePicker(this)" class="block border rounded p-2 bg-white cursor-pointer text-gray-400 w-36 text-center font-medium">
-        <input id="dateReal" type="date" onchange="onDateSelected(this)" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer pointer-events-none">
+    <div class="flex items-center gap-1 mt-1">
+        <input id="date" type="text" placeholder="2026-05-01" class="border rounded p-2 bg-white text-sm w-32 text-center">
+        <button type="button" onclick="setTodayDate()" class="bg-gray-100 border rounded px-2.5 py-2 text-xs hover:bg-gray-200">今日</button>
     </div>
 </label>
 <button data-edit onclick="addSelected()" class="bg-indigo-600 text-white rounded p-2 text-sm">選択生徒に日付追加</button>
@@ -82,10 +82,9 @@ const config={apiKey:"AIzaSyD-KJ1Yx5Pim-HIq5Vt0xvAuQbltZfBTKg",authDomain:"kyoum
 const DOMAIN="g.kagawa-edu.jp",fb=initializeApp(config),db=getFirestore(fb),auth=getAuth(fb),provider=new GoogleAuthProvider();
 provider.setCustomParameters({hd:DOMAIN,prompt:"select_account"});
 let user=null,data=null,year="",classId="",stop=null,history=[],loaded=false,pendingDelete=null,saveTimer=null,remoteApplying=false;
-let chosenDate = "";
 
 const $=id=>document.getElementById(id),copy=x=>JSON.parse(JSON.stringify(x));
-const today=()=>{let d=new Date();d=new Date(d.getTime()-d.getTimezoneOffset()*60000);return d.toISOString().slice(0,10)};
+const localToday=()=>{let d=new Date();d=new Date(d.getTime()-d.getTimezoneOffset()*60000);return d.toISOString().slice(0,10)};
 const formatDateDisplay=d=>(d&&d.length>=10)?d.slice(5):d;
 
 function status(t){$("status").textContent=t}
@@ -108,26 +107,28 @@ window.goHome = () => {
     render();
 };
 
-window.activateDatePicker = () => {
-    let real = $("dateReal");
+window.setTodayDate = () => {
     if(readonly()) return;
-    if(typeof real.showPicker === 'function') {
-        try { real.showPicker(); } catch(e) {}
-    } else {
-        real.click();
-    }
+    $("date").value = localToday();
 };
 
-window.onDateSelected = (el) => {
-    let val = el.value;
-    if(val) {
-        chosenDate = val;
-        let disp = $("dateDisplay");
-        disp.value = val;
-        disp.classList.remove("text-gray-400");
-        disp.classList.add("text-indigo-700", "font-bold");
+function parseDateInput(str) {
+    str = str.trim();
+    if (!str) return "";
+    let currentYear = new Date().getFullYear();
+    // 「MM-DD」や「MM/DD」形式で入力された場合、自動で今年を補完
+    if (/^\d{1,2}[-\/]\d{1,2}$/.test(str)) {
+        let parts = str.split(/[-\/]/);
+        let m = parts[0].padStart(2, '0');
+        let d = parts[1].padStart(2, '0');
+        return `${currentYear}-${m}-${d}`;
     }
-};
+    // 「YYYY-MM-DD」形式
+    if (/^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/.test(str)) {
+        return str.replace(/\//g, '-');
+    }
+    return str;
+}
 
 function render(){
     let ys=$("year");ys.innerHTML="";
@@ -201,7 +202,6 @@ function render(){
                 b.className="bg-gray-100 border rounded px-2 py-1 m-0.5 text-xs hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition";
                 b.textContent=formatDateDisplay(d)+" ×";
                 b.disabled=readonly();
-                // 削除時に確認メッセージを表示
                 b.onclick=()=>removeDateWithConfirm(s.id, s.name, d, i);
                 dates.append(b);
             });
@@ -219,14 +219,10 @@ function render(){
     $("readonly").classList.toggle("hidden",!readonly());
     document.querySelectorAll("[data-edit]").forEach(b=>b.disabled=readonly());
     
-    chosenDate = "";
-    let disp = $("dateDisplay");
-    disp.value = "日付を選択...";
-    disp.classList.remove("text-indigo-700", "font-bold");
-    disp.classList.add("text-gray-400");
-    $("dateReal").value = "";
-    $("dateReal").disabled = readonly();
-    disp.disabled = readonly();
+    // 日付欄を初期は空にリセット
+    let dateInput = $("date");
+    dateInput.value = "";
+    dateInput.disabled = readonly();
 
     if($("all")){ $("all").disabled=readonly(); $("all").checked=false; }
 }
@@ -250,9 +246,10 @@ window.selectAll=m=>document.querySelectorAll(".student-check").forEach(c=>c.che
 
 window.addSelected=()=>{
     if(!editable())return;
-    let d = chosenDate;
-    if(!d) {
-        alert("対象の日付が選択されていません。「日付を選択...」をタップしてカレンダーから選んでください。");
+    let rawVal = $("date").value;
+    let d = parseDateInput(rawVal);
+    if(!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        alert("日付が正しく入力されていません。「今日」ボタンを押すか、例（2026-05-01 または 05-01）の形式で入力してください。");
         return;
     }
     let selected=[...document.querySelectorAll(".student-check:checked")];
@@ -265,9 +262,7 @@ window.addSelected=()=>{
 
 window.addToday=id=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.push(localToday());s.absences.sort();render();queueSave()};
 window.addDateToStudent=(id,d)=>{if(!editable())return;let s=cls().students.find(x=>x.id===id);if(!s)return;hist();s.absences.push(d);s.absences.sort();render();queueSave()};
-function localToday(){let d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
 
-// 確認メッセージつきの削除関数
 window.removeDateWithConfirm=(id, studentName, dateStr, i)=>{
     if(!editable())return;
     if(confirm(`${studentName} の ${formatDateDisplay(dateStr)} の欠課を削除しますか？`)){
