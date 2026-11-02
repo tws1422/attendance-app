@@ -137,25 +137,37 @@ function render(){
         let totalLimit = (c.units || 2) * 5;
 
         [...c.students].sort((a,b)=>a.number-b.number).forEach(s=>{
-            let tr=document.createElement("tr");tr.className="border-t hover:bg-gray-50";
+            let absencesCount = s.absences.length;
+            let remaining = totalLimit - absencesCount;
+
+            let tr=document.createElement("tr");
+            
+            // 欠課時数オーバー（remaining < 0 または上限オーバー）の場合、行の背景色を薄めの赤に
+            if(remaining < 0){
+                tr.className="border-t bg-red-50 hover:bg-red-100";
+            } else {
+                tr.className="border-t hover:bg-gray-50";
+            }
+
             let td=document.createElement("td");td.className="p-3 text-center";
             let cb=document.createElement("input");cb.type="checkbox";cb.className="student-check";cb.dataset.id=s.id;cb.disabled=readonly();td.append(cb);tr.append(td);
             
             let x=document.createElement("td");x.className="p-3 text-center";x.textContent=s.number;tr.append(x);
-            let n=document.createElement("td");n.className="p-3 font-semibold";n.textContent=s.name;tr.append(n);
             
-            let absencesCount = s.absences.length;
-            let remaining = totalLimit - absencesCount;
-
+            // 氏名欄（残数に応じて文字色を変更）
+            let n=document.createElement("td");
+            n.className="p-3 font-semibold";
+            n.textContent=s.name;
+            if(remaining < 5){
+                n.classList.add("text-red-600"); // 5時間未満・超過は赤
+            }else if(remaining < 10){
+                n.classList.add("text-amber-600"); // 10時間未満は黄色（山吹色）
+            }
+            tr.append(n);
+            
             let count=document.createElement("td");
             count.className="p-3 text-center font-bold";
             count.textContent = absencesCount;
-
-            if(remaining < 5){
-                count.innerHTML += ` <span class="text-red-600" title="欠課残り5時間未満 (危険)">‼️</span>`;
-            }else if(remaining < 10){
-                count.innerHTML += ` <span class="text-amber-500" title="欠課残り10時間未満 (注意)">❗️</span>`;
-            }
             tr.append(count);
             
             let dates=document.createElement("td");dates.className="p-3";
@@ -271,7 +283,7 @@ window.saveStudents=()=>{
     let pasteText=$("paste").value.trim();
     if(pasteText){
         pasteText.split(/\r?\n/).forEach((line,i)=>{
-            if(!line.trim())return;
+            if(!line.nitr?.trim()&&!line.trim())return;
             let cols=line.split("\t");
             if(cols.length>=2){
                 appendStudentRow(parseInt(cols[0])||(i+1),cols.slice(1).join(" ").trim());
