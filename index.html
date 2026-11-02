@@ -19,7 +19,7 @@
 <div id="actionControls" class="flex flex-wrap items-end gap-2 hidden">
 <label class="text-xs">対象日付
     <div class="flex items-center gap-1 mt-1">
-        <input id="date" type="text" placeholder="2026-05-01" class="border rounded p-2 bg-white text-sm w-32 text-center">
+        <input id="date" type="text" placeholder="YYYY-MM-DD" class="border rounded p-2 bg-white text-sm w-36 text-center">
         <button type="button" onclick="setTodayDate()" class="bg-gray-100 border rounded px-2.5 py-2 text-xs hover:bg-gray-200">今日</button>
     </div>
 </label>
@@ -219,10 +219,9 @@ function render(){
     $("readonly").classList.toggle("hidden",!readonly());
     document.querySelectorAll("[data-edit]").forEach(b=>b.disabled=readonly());
     
-    // 日付欄を初期は空にリセット
-    let dateInput = $("date");
-    dateInput.value = "";
-    dateInput.disabled = readonly();
+    // 初期状態は空（勝手に入力されないようにする）
+    $("date").value = "";
+    $("date").disabled = readonly();
 
     if($("all")){ $("all").disabled=readonly(); $("all").checked=false; }
 }
