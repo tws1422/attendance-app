@@ -85,7 +85,16 @@ let user=null,data=null,year="",classId="",stop=null,history=[],loaded=false,pen
 
 const $=id=>document.getElementById(id),copy=x=>JSON.parse(JSON.stringify(x));
 const localToday=()=>{let d=new Date();d=new Date(d.getTime()-d.getTimezoneOffset()*60000);return d.toISOString().slice(0,10)};
-const formatDateDisplay=d=>(d&&d.length>=10)?d.slice(5):d;
+
+// 画面表示用：YYYY-MM-DD を MM/DD に変換する（例: 2026-10-10 -> 10/10）
+const formatDateDisplay = d => {
+    if (!d || d.length < 10) return d;
+    let parts = d.split('-');
+    if (parts.length === 3) {
+        return `${parts[1]}/${parts[2]}`;
+    }
+    return d.slice(5);
+};
 
 function status(t){$("status").textContent=t}
 function defaultData(){return{schemaVersion:2,years:{"2026年度":{classes:{}}}}}
@@ -112,7 +121,6 @@ window.setTodayDate = () => {
     $("date").value = localToday();
 };
 
-// 入力された文字列を解析して「YYYY-MM-DD」形式に変換する強力なパーサー
 function parseDateInput(str) {
     str = str.trim();
     if (!str) return "";
@@ -296,7 +304,7 @@ window.removeDateWithConfirm=(id, studentName, dateStr, i)=>{
 };
 
 window.undo=()=>{if(!editable())return;if(!history.length)return alert("戻せる操作履歴がありません。");data=history.pop();render();queueSave()};
-window.csv=()=>{let c=cls();if(!c)return;let q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';let out="\uFEFF年度,"+q(year)+"\r\nクラス,"+q(c.name)+"\r\n科目,"+q(c.subject)+"\r\n単位数,"+c.units+"\r\n\r\n出席番号,氏名,欠課回数,欠課日\r\n";c.students.forEach(s=>out+=[q(s.number),q(s.name),s.absences.length,q(s.absences.join(" "))].join(",")+"\r\n");let a=document.createElement("a"),u=URL.createObjectURL(new Blob([out],{type:"text/csv;charset=utf-8"}));a.href=u;a.download=`出欠記録_${year}_${c.name}.csv`;a.click();URL.revokeObjectURL(u)};
+window.csv=()=>{let c=cls();if(!c)return;let q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';let out="\uFEFF年度,"+q(year)+"\r\nクラス,"+q(c.name)+"\r\n科目,"+q(c.subject)+"\r\n単位数,"+c.units+"\r\n\r\n出席番号,氏名,欠課回数,欠課日\r\n";c.students.forEach(s=>out+=[q(s.number),q(s.name),s.absences.length,q(s.absences.map(d=>formatDateDisplay(d)).join(" "))].join(",")+"\r\n");let a=document.createElement("a"),u=URL.createObjectURL(new Blob([out],{type:"text/csv;charset=utf-8"}));a.href=u;a.download=`出欠記録_${year}_${c.name}.csv`;a.click();URL.revokeObjectURL(u)};
 
 window.downloadTemplate=()=>{let out="\uFEFF出席番号,氏名\r\n1,青木 一郎\r\n2,井上 花子\r\n3,佐藤 健太\r\n";let a=document.createElement("a"),u=URL.createObjectURL(new Blob([out],{type:"text/csv;charset=utf-8"}));a.href=u;a.download=`生徒名簿テンプレート.csv`;a.click();URL.revokeObjectURL(u)};
 
@@ -354,7 +362,6 @@ window.openStudents=()=>{
     $("paste").value="";
     let container=$("studentRows");
     container.innerHTML="";
-    cls().students.students?.forEach?.(s=>appendStudentRow(s.number,s.name)); // safety
     cls().students.forEach(s=>appendStudentRow(s.number,s.name));
     show("studentModal");
 };
@@ -396,29 +403,4 @@ window.saveStudents=()=>{
             if(cols.length>=2){
                 appendStudentRow(parseInt(cols[0])||(i+1),cols.slice(1).join(" ").trim());
             }else if(cols.length===1){
-                let name=cols[0].trim();
-                if(name)appendStudentRow(i+1,name);
-            }
-        });
-        $("paste").value="";
-    }
-    let used=new Set(),arr=[];
-    for(let[i,r]of [...document.querySelectorAll("#studentRows > div")].entries()){
-        let inputs = r.querySelectorAll("input");
-        let n=Number(inputs[0].value)||(i+1),name=inputs[1].value.trim();
-        if(!name)continue;
-        if(used.has(n))return alert(`出席番号${n}が重複しています。`);
-        used.add(n);
-        let old=cls().students.find(s=>s.name===name);
-        arr.push({id:i+1,number:n,name,absences:old?[...old.absences]:[]});
-    }
-    hist();
-    cls().students=arr;
-    hide("studentModal");
-    render();
-    queueSave();
-};
-
-window.show=id=>{$(id).classList.remove("hidden");$(id).classList.add("flex")};
-window.hide=id=>{$(id).classList.add("hidden");$(id).classList.remove("flex")};
-</script></body></html>
+                let
