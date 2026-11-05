@@ -7,7 +7,15 @@
 <h1 onclick="goHome()" class="font-bold text-xl cursor-pointer hover:opacity-90">📚 教務手帳 for iPad</h1><div class="flex flex-wrap items-center gap-2">
 <span id="status" class="text-xs bg-yellow-400 text-black rounded px-2 py-1">未ログイン</span><span id="email" class="text-xs"></span>
 <button id="login" onclick="login()" class="bg-white text-indigo-800 rounded px-3 py-2 text-sm">Googleでログイン</button><button id="logout" onclick="logout()" class="hidden bg-indigo-900 rounded px-3 py-2 text-sm">ログアウト</button>
-<div id="yearBox" class="hidden flex gap-1 items-center bg-indigo-900 rounded p-1"><select id="year" onchange="changeYear(this.value)" class="bg-indigo-950 rounded p-1 text-sm"></select><button onclick="addYear()" class="bg-indigo-600 rounded px-2">＋年度</button><button onclick="deleteYear()" class="bg-red-600 rounded px-2">削除</button></div>
+<div id="yearBox" class="hidden flex flex-wrap gap-1 items-center bg-indigo-900 rounded p-1">
+<select id="year" onchange="changeYear(this.value)" class="bg-indigo-950 rounded p-1 text-sm text-white"></select>
+<button onclick="addYear()" class="bg-indigo-600 rounded px-2 text-sm">＋年度</button>
+<button onclick="deleteYear()" class="bg-red-600 rounded px-2 text-sm">削除</button>
+<button onclick="exportJSON()" class="bg-emerald-600 text-white rounded px-2 text-sm ml-1" title="全データをJSON保存">📥 バックアップ</button>
+<label class="bg-amber-600 text-white rounded px-2 text-sm cursor-pointer" title="JSONから全データを復元">
+  📤 復元<input type="file" accept=".json" class="hidden" onchange="importJSON(this)">
+</label>
+</div>
 </div></div></header>
 <main id="main" class="hidden max-w-7xl w-full mx-auto p-4 flex-1 flex-col gap-4">
 <div id="readonly" class="hidden bg-amber-100 border border-amber-300 rounded p-3 text-sm">過去年度は閲覧専用です。CSV出力のみ利用できます。</div>
@@ -38,7 +46,15 @@
 
 <!-- クラス情報・テーブルエリア（初期は非表示） -->
 <div id="classContentArea" class="hidden flex flex-col gap-4 flex-1">
-<section class="bg-indigo-50 border border-indigo-100 rounded-xl p-4"><h2 id="className" class="font-bold text-lg">—</h2><p class="text-sm">科目: <span id="subject">—</span> / 単位数: <span id="units">—</span></p></section>
+<section class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex flex-wrap justify-between items-center gap-2">
+  <div>
+    <h2 id="className" class="font-bold text-lg">—</h2>
+    <p class="text-sm">科目: <span id="subject">—</span> / 単位数: <span id="units">—</span>単位</p>
+  </div>
+  <div id="unitLimitsBadge" class="text-xs bg-white border border-indigo-200 rounded-lg p-2 flex gap-3 text-gray-600">
+    <!-- 単位数に応じた上限値を動的表示 -->
+  </div>
+</section>
 <section class="bg-white border rounded-xl overflow-x-auto flex-1"><table class="w-full text-sm"><thead class="bg-gray-100"><tr><th class="p-3"><input type="checkbox" id="all" onchange="selectAll(this)"></th><th class="p-3">番号</th><th class="p-3 text-left">氏名</th><th class="p-3">欠課回数</th><th class="p-3 text-left">欠課日（クリックで削除）</th><th class="p-3">操作</th></tr></thead><tbody id="rows"></tbody></table></section>
 </div>
 </main>
@@ -86,7 +102,7 @@ let user=null,data=null,year="",classId="",stop=null,history=[],loaded=false,pen
 const $=id=>document.getElementById(id),copy=x=>JSON.parse(JSON.stringify(x));
 const localToday=()=>{let d=new Date();d=new Date(d.getTime()-d.getTimezoneOffset()*60000);return d.toISOString().slice(0,10)};
 
-// 画面表示用：YYYY-MM-DD を MM/DD に変換する（例: 2026-10-10 -> 10/10）
+// 画面表示用：YYYY-MM-DD を MM/DD に変換する
 const formatDateDisplay = d => {
     if (!d || d.length < 10) return d;
     let parts = d.split('-');
@@ -95,6 +111,15 @@ const formatDateDisplay = d => {
     }
     return d.slice(5);
 };
+
+// 単位数に基づく欠課上限数の計算ロジック（1単位あたり35コマ換算）
+function getAbsenceLimits(units) {
+    const totalHours = (units || 2) * 35;
+    const limitMax = Math.ceil(totalHours / 3); // 1/3超過（履修不可）の閾値
+    const limitWarning = Math.floor(limitMax * 0.7); // 警戒〜警告の閾値 (約70%)
+    const limitCaution = Math.floor(limitMax * 0.4); // 注意の閾値 (約40%)
+    return { totalHours, limitMax, limitWarning, limitCaution };
+}
 
 function status(t){$("status").textContent=t}
 function defaultData(){return{schemaVersion:2,years:{"2026年度":{classes:{}}}}}
@@ -126,26 +151,20 @@ function parseDateInput(str) {
     if (!str) return "";
     let currentYear = yrNum(year) || new Date().getFullYear();
 
-    // 1. 「mmdd」（数字4桁）と入力された場合
     if (/^\d{4}$/.test(str)) {
         let m = str.slice(0, 2);
         let d = str.slice(2, 4);
         return `${currentYear}-${m}-${d}`;
     }
-
-    // 2. 「mm-dd」や「mm/dd」、「mm.dd」形式の場合
     if (/^\d{1,2}[-\/\.]\d{1,2}$/.test(str)) {
         let parts = str.split(/[-\/\.]/);
         let m = parts[0].padStart(2, '0');
         let d = parts[1].padStart(2, '0');
         return `${currentYear}-${m}-${d}`;
     }
-
-    // 3. すでに「YYYY-MM-DD」形式に近い場合
     if (/^\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}$/.test(str)) {
         return str.replace(/[\/\.]/g, '-');
     }
-
     return str;
 }
 
@@ -187,6 +206,14 @@ function render(){
         let units = c?.units || 2;
         $("units").textContent=units;
 
+        // 単位数に基づく警告目安を表示
+        const limits = getAbsenceLimits(units);
+        $("unitLimitsBadge").innerHTML = `
+            <span>注意: <b>${limits.limitCaution}</b>回〜</span>
+            <span>警告: <b class="text-amber-600">${limits.limitWarning}</b>回〜</span>
+            <span>単位不可: <b class="text-red-600">${limits.limitMax}</b>回以上</span>
+        `;
+
         $("rows").innerHTML="";
 
         [...c.students].sort((a,b)=>a.number-b.number).forEach(s=>{
@@ -194,12 +221,13 @@ function render(){
 
             let tr=document.createElement("tr");
             
-            if(absencesCount >= 12){
-                tr.className="border-t bg-red-200 hover:bg-red-300 font-semibold";
-            }else if(absencesCount >= 7){
-                tr.className="border-t bg-red-50 hover:bg-red-100";
-            }else if(absencesCount >= 2){
-                tr.className="border-t bg-amber-50 hover:bg-amber-100";
+            // 単位数基準での色分けロジック
+            if(absencesCount >= limits.limitMax){
+                tr.className="border-t bg-red-200 hover:bg-red-300 font-bold text-red-950"; // 単位習得不可レベル
+            }else if(absencesCount >= limits.limitWarning){
+                tr.className="border-t bg-red-50 hover:bg-red-100"; // 警告レベル
+            }else if(absencesCount >= limits.limitCaution){
+                tr.className="border-t bg-amber-50 hover:bg-amber-100"; // 注意レベル
             }else{
                 tr.className="border-t hover:bg-gray-50";
             }
@@ -213,6 +241,7 @@ function render(){
             let count=document.createElement("td");
             count.className="p-3 text-center font-bold";
             count.textContent = absencesCount;
+            if(absencesCount >= limits.limitMax) count.textContent += " ⚠️";
             tr.append(count);
             
             let dates=document.createElement("td");dates.className="p-3";
@@ -307,6 +336,48 @@ window.undo=()=>{if(!editable())return;if(!history.length)return alert("戻せ�
 window.csv=()=>{let c=cls();if(!c)return;let q=x=>'"'+String(x??"").replace(/"/g,'""')+'"';let out="\uFEFF年度,"+q(year)+"\r\nクラス,"+q(c.name)+"\r\n科目,"+q(c.subject)+"\r\n単位数,"+c.units+"\r\n\r\n出席番号,氏名,欠課回数,欠課日\r\n";c.students.forEach(s=>out+=[q(s.number),q(s.name),s.absences.length,q(s.absences.map(d=>formatDateDisplay(d)).join(" "))].join(",")+"\r\n");let a=document.createElement("a"),u=URL.createObjectURL(new Blob([out],{type:"text/csv;charset=utf-8"}));a.href=u;a.download=`出欠記録_${year}_${c.name}.csv`;a.click();URL.revokeObjectURL(u)};
 
 window.downloadTemplate=()=>{let out="\uFEFF出席番号,氏名\r\n1,青木 一郎\r\n2,井上 花子\r\n3,佐藤 健太\r\n";let a=document.createElement("a"),u=URL.createObjectURL(new Blob([out],{type:"text/csv;charset=utf-8"}));a.href=u;a.download=`生徒名簿テンプレート.csv`;a.click();URL.revokeObjectURL(u)};
+
+// JSON一括バックアップ機能
+window.exportJSON=()=>{
+    if(!data) return alert("データが存在しません。");
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], {type: "application/json;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `教務手帳_全データバックアップ_${localToday()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+// JSON一括復元機能
+window.importJSON=(input)=>{
+    const file = input.files[0];
+    if(!file) return;
+    if(!confirm("現在クラウド上の全データが、読み込んだJSONファイルの内容で上書きされます。よろしいですか？")) {
+        input.value = "";
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const imported = JSON.parse(e.target.result);
+            if(!imported || typeof imported !== "object") throw new Error("無効なJSONフォーマットです");
+            hist();
+            data = normalize(imported);
+            year = latest();
+            classId = "";
+            render();
+            queueSave();
+            alert("データを復元・上書き保存しました。");
+        } catch(err) {
+            console.error(err);
+            alert("JSONファイルの読み込みに失敗しました。正しいバックアップファイルか確認してください。");
+        }
+        input.value = "";
+    };
+    reader.readAsText(file, "UTF-8");
+};
 
 window.loadCSVFile=(input)=>{
     let file=input.files[0];if(!file)return;
